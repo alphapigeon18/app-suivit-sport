@@ -135,6 +135,17 @@ cron.schedule('0 4 * * *', async () => {
 // Petite fonction utilitaire pour utiliser await avec exec
 import { promisify } from 'util';
 const execPromise = promisify(exec);
+// Ajoute une route dédiée au déclenchement du cron
+app.get('/cron-daily', async (req, res) => {
+    console.log("🚀 Déclenchement manuel du job quotidien...");
+    await execPromise('node maj-competitions.js');
+    await execPromise('node init-calendrier.js');
+    await execPromise('node maj-quotidienne.js');
+    res.status(200).send("Job terminé");
+});
+app.get('/', (req, res) => {
+    res.send('Serveur opérationnel !');
+});
 
 // ============================================================================
 // 🚀 DÉMARRAGE DU SERVEUR
