@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
+
+
 
 const traductionsPhase = { "Round of 16": "Huitièmes de finale", "Quarter-finals": "Quarts de finale", "Semi-finals": "Demi-finales", "Final": "Finale", "3rd Place Final": "Troisième place" };
 const traductionsStatut = { "FINISHED": "Terminé", "LIVE": "En direct", "SCHEDULED": "À venir", "POSTPONED": "Reporté" };
@@ -20,7 +23,7 @@ function CompetitionDetails() {
   const [groupeActif, setGroupeActif] = useState('');
 
   useEffect(() => {
-    fetch(`http://localhost:3000/competitions/${id}/matchs`)
+    fetch(`${API_BASE_URL}/competitions/${id}/matchs`)
       .then((res) => res.json())
       .then((donnees) => {
         setLigue(donnees.ligue || null);

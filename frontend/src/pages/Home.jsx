@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
 
 function Home() {
   const [competitions, setCompetitions] = useState([]);
@@ -8,7 +9,7 @@ function Home() {
   const navigate = useNavigate(); // 🚀 L'outil magique de navigation !
 
   useEffect(() => {
-    fetch('http://localhost:3000/competitions')
+    fetch(`${API_BASE_URL}/competitions`)
       .then((reponse) => {
         if (!reponse.ok) throw new Error("Problème réseau");
         return reponse.json();
