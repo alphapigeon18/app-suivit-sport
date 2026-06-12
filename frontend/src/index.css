@@ -1,3 +1,91 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+body {
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+}
+
+/* ============================================================
+   ARBRE DE TOURNOI
+   Chaque paire de matchs est reliée par un "coude" au match du
+   tour suivant : impair → coude vers le bas, pair → coude vers
+   le haut, et le match suivant reçoit une ligne entrante.
+   ============================================================ */
+.bracket {
+  display: flex;
+  align-items: stretch;
+}
+
+.bracket-round {
+  display: flex;
+  flex-direction: column;
+}
+
+.bracket-round + .bracket-round {
+  margin-left: 48px;
+}
+
+.bracket-items {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.bracket-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  padding: 10px 0;
+}
+
+.bracket-item > * {
+  width: 100%;
+}
+
+/* Coudes sortants (sauf dernier tour) */
+.bracket-round:not(.bracket-last) .bracket-item::after {
+  content: '';
+  position: absolute;
+  right: -24px;
+  width: 24px;
+}
+
+.bracket-round:not(.bracket-last) .bracket-item:nth-child(odd)::after {
+  top: 50%;
+  height: 50%;
+  border-top: 2px solid #cbd5e1;
+  border-right: 2px solid #cbd5e1;
+  border-top-right-radius: 8px;
+}
+
+.bracket-round:not(.bracket-last) .bracket-item:nth-child(even)::after {
+  bottom: 50%;
+  height: 50%;
+  border-bottom: 2px solid #cbd5e1;
+  border-right: 2px solid #cbd5e1;
+  border-bottom-right-radius: 8px;
+}
+
+/* Colonne à match unique : simple ligne droite */
+.bracket-round:not(.bracket-last) .bracket-item:only-child::after {
+  top: calc(50% - 1px);
+  height: 2px;
+  border: none;
+  background: #cbd5e1;
+  border-radius: 0;
+}
+
+/* Ligne entrante (tous les tours sauf le premier) */
+.bracket-round:not(:first-child) .bracket-item:not(.bracket-isole)::before {
+  content: '';
+  position: absolute;
+  left: -24px;
+  top: calc(50% - 1px);
+  width: 24px;
+  height: 2px;
+  background: #cbd5e1;
+}

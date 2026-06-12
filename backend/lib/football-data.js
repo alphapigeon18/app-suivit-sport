@@ -63,6 +63,7 @@ export function determinerPhaseFd(matchFd) {
     }
     if (phasesFd[matchFd.stage]) return phasesFd[matchFd.stage];
     if (matchFd.stage === 'REGULAR_SEASON') return `Regular Season - ${matchFd.matchday}`;
+    if (matchFd.stage === 'LEAGUE_STAGE') return `League Stage - ${matchFd.matchday}`;
     return matchFd.stage;
 }
 

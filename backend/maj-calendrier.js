@@ -70,16 +70,26 @@ export async function majCalendrier() {
                 const eqExt = (await obtenirEquipeFd(matchFd.awayTeam, football.sport_id)) || equipeMystere;
                 const startTime = new Date(matchFd.utcDate);
 
+                // ⚠️ En cas de tirs au but, football-data les additionne dans
+                // fullTime : on les soustrait pour retrouver le vrai score.
+                const penalties = matchFd.score?.penalties;
+                let scoreDom = matchFd.score?.fullTime?.home ?? null;
+                let scoreExt = matchFd.score?.fullTime?.away ?? null;
+                if (penalties && scoreDom !== null && scoreExt !== null) {
+                    scoreDom -= penalties.home ?? 0;
+                    scoreExt -= penalties.away ?? 0;
+                }
+
                 const donneesMatch = {
                     season_id: saison.season_id,
                     home_team_id: eqDom.team_id,
                     away_team_id: eqExt.team_id,
                     start_time: startTime,
                     status: determinerStatutFd(matchFd.status),
-                    home_score: matchFd.score?.fullTime?.home ?? null,
-                    away_score: matchFd.score?.fullTime?.away ?? null,
-                    home_penalty: matchFd.score?.penalties?.home ?? null,
-                    away_penalty: matchFd.score?.penalties?.away ?? null,
+                    home_score: scoreDom,
+                    away_score: scoreExt,
+                    home_penalty: penalties?.home ?? null,
+                    away_penalty: penalties?.away ?? null,
                     home_winner: matchFd.score?.winner ? matchFd.score.winner === 'HOME_TEAM' : null,
                     away_winner: matchFd.score?.winner ? matchFd.score.winner === 'AWAY_TEAM' : null,
                     phase: determinerPhaseFd(matchFd),
