@@ -14,33 +14,73 @@ app.use(express.json());
 app.use(cors());
 
 // ============================================================================
-// ⚙️ JOB QUOTIDIEN (déclenché par cron-job.org via /cron-daily)
+// ⚙️ CYCLE DE MISE À JOUR (déclenché par le ping cron-job.org toutes les 10 min)
+//
+// Le serveur décide lui-même quoi faire pour respecter les quotas gratuits
+// (API-Sports : 100 appels/jour) :
+//   - 1 fois par jour : synchronisation complète du calendrier (football-data)
+//   - sinon : rafraîchissement des scores UNIQUEMENT si des matchs sont en
+//     cours ou démarrent bientôt (1 appel API-Sports)
+//   - sinon : rien (le ping sert juste de keep-alive)
 // ============================================================================
 let jobEnCours = false;
+let derniereSyncCalendrier = 0;
+const INTERVALLE_CALENDRIER = 23 * 60 * 60 * 1000; // ~1 fois par jour
 
-async function runDailyJobs() {
+async function matchsEnCoursOuImminents() {
+    const maintenant = Date.now();
+    return prisma.match.count({
+        where: {
+            OR: [
+                { status: 'IN_PLAY' },
+                {
+                    status: 'SCHEDULED',
+                    start_time: {
+                        gte: new Date(maintenant - 3 * 60 * 60 * 1000), // démarré il y a < 3h (statut pas encore à jour)
+                        lte: new Date(maintenant + 30 * 60 * 1000),     // ou qui démarre dans < 30 min
+                    },
+                },
+            ],
+        },
+    });
+}
+
+async function executerCycle() {
     if (jobEnCours) {
         console.log('⏭️ Un cycle est déjà en cours, on ignore ce déclenchement.');
         return;
     }
     jobEnCours = true;
-    console.log(`\n🔄 [${new Date().toISOString()}] Début du cycle de mise à jour...`);
-
-    const etapes = [
-        ['Calendrier complet (football-data)', majCalendrier],
-        ['MAJ quotidienne (API-Sports)', majQuotidienne],
-    ];
-
-    for (const [nom, etape] of etapes) {
-        try {
-            await etape();
-        } catch (erreur) {
-            console.error(`❌ Erreur critique sur "${nom}":`, erreur.message);
+    try {
+        if (Date.now() - derniereSyncCalendrier > INTERVALLE_CALENDRIER) {
+            console.log(`\n🔄 [${new Date().toISOString()}] Cycle complet quotidien...`);
+            try {
+                await majCalendrier();
+                derniereSyncCalendrier = Date.now();
+            } catch (erreur) {
+                console.error('❌ Erreur sur le calendrier (football-data) :', erreur.message);
+            }
+            try {
+                await majQuotidienne();
+            } catch (erreur) {
+                console.error('❌ Erreur sur la MAJ quotidienne (API-Sports) :', erreur.message);
+            }
+            console.log('🏁 Cycle complet terminé.');
+            return;
         }
-    }
 
-    jobEnCours = false;
-    console.log('🏁 Cycle terminé.');
+        const actifs = await matchsEnCoursOuImminents();
+        if (actifs > 0) {
+            console.log(`⚽ ${actifs} match(s) en cours ou imminent(s) : rafraîchissement des scores...`);
+            try {
+                await majQuotidienne();
+            } catch (erreur) {
+                console.error('❌ Erreur sur le rafraîchissement live :', erreur.message);
+            }
+        }
+    } finally {
+        jobEnCours = false;
+    }
 }
 
 // ============================================================================
@@ -51,7 +91,7 @@ app.get('/', (req, res) => {
     res.send('Serveur opérationnel !');
 });
 
-// Déclenchement du job quotidien (appelé par cron-job.org).
+// Déclenchement du cycle de mise à jour (pingé par cron-job.org toutes les 10 min).
 // Protégé par un token (variable d'environnement CRON_SECRET).
 app.get('/cron-daily', (req, res) => {
     const secret = process.env.CRON_SECRET;
@@ -64,8 +104,8 @@ app.get('/cron-daily', (req, res) => {
 
     // On répond tout de suite (cron-job.org a un timeout court),
     // le cycle continue en arrière-plan.
-    res.status(202).send('Job quotidien lancé.');
-    runDailyJobs();
+    res.status(202).send('Cycle de mise à jour lancé.');
+    executerCycle();
 });
 
 // Liste des compétitions (page d'accueil)
