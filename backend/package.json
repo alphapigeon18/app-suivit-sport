@@ -5,6 +5,8 @@
   "description": "Backend pour le suivi sportif",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
+    "postinstall": "prisma generate",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -15,8 +17,7 @@
     "axios": "^1.17.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "node-cron": "^4.2.1"
+    "express": "^5.2.1"
   },
   "devDependencies": {
     "prisma": "^6.0.0"

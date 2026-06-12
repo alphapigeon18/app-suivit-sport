@@ -1,47 +1,42 @@
-import axios from 'axios';
-import { PrismaClient } from '@prisma/client';
+import prisma from './lib/prisma.js';
+import { appelApiSports, competitionsCibles, estLanceEnLigneDeCommande, obtenirSaison, pause } from './lib/football.js';
 
-const prisma = new PrismaClient();
-const competitionsCibles = [1, 2, 3, 4, 39, 61, 66, 78, 140];
+// Veille : détecte les nouvelles éditions (saisons) des compétitions suivies
+// et crée la ligne season correspondante si elle n'existe pas encore.
+export async function verifierNouvellesEditions() {
+    console.log('🔍 Veille active : recherche de nouvelles éditions...');
 
-async function verifierNouvellesEditions() {
-    console.log("🔍 Veille active : recherche de nouvelles éditions...");
-    
-    for (const compId of competitionsCibles) {
+    for (const apiId of competitionsCibles) {
         try {
-            const rep = await axios.get(`https://v3.football.api-sports.io/leagues`, {
-                headers: { 'x-apisports-key': process.env.API_SPORTS_KEY },
-                params: { id: compId }
+            const [donneesLigue] = await appelApiSports('leagues', { id: apiId });
+            if (!donneesLigue) continue;
+
+            const competition = await prisma.competition.findUnique({ where: { api_id: apiId } });
+            if (!competition) {
+                console.log(`⚠️ Compétition API ${apiId} absente du catalogue (lancer import-competition).`);
+                continue;
+            }
+
+            const saisonCourante = donneesLigue.seasons.find((s) => s.current === true);
+            if (!saisonCourante) continue;
+
+            const existante = await prisma.season.findFirst({
+                where: { competition_id: competition.competition_id, year_label: saisonCourante.year.toString() },
             });
 
-            const leagueData = rep.data.response[0];
-            if (!leagueData) continue;
-
-            // On regarde toutes les saisons disponibles
-            for (const saisonInfo of leagueData.seasons) {
-                const annee = saisonInfo.year.toString();
-                
-                // Vérifier si cette saison existe en base
-                let saison = await prisma.season.findFirst({ 
-                    where: { competition_id: compId.toString(), year_label: annee } 
-                });
-
-                if (!saison) {
-                    console.log(`✨ Nouvelle édition détectée : ${leagueData.league.name} ${annee}`);
-                    await prisma.season.create({
-                        data: {
-                            competition_id: compId.toString(),
-                            year_label: annee
-                            // Tu peux ajouter ici une colonne 'description' si tu veux stocker le texte de résumé
-                        }
-                    });
-                }
+            if (!existante) {
+                console.log(`✨ Nouvelle édition détectée : ${donneesLigue.league.name} ${saisonCourante.year}`);
+                await obtenirSaison(competition.competition_id, saisonCourante.year);
             }
-        } catch (e) {
-            console.error(`Erreur sur la ligue ${compId}:`, e.message);
+
+            await pause(6500); // Limite du plan gratuit : 10 appels/minute
+        } catch (erreur) {
+            console.error(`❌ Erreur sur la ligue ${apiId}:`, erreur.message);
         }
     }
-    await prisma.$disconnect();
+    console.log('🏁 Veille terminée.');
 }
 
-verifierNouvellesEditions();
+if (estLanceEnLigneDeCommande(import.meta.url)) {
+    verifierNouvellesEditions().finally(() => prisma.$disconnect());
+}

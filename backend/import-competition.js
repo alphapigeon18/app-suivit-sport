@@ -1,72 +1,50 @@
-import axios from 'axios';
-import { PrismaClient } from '@prisma/client';
+import prisma from './lib/prisma.js';
+import { appelApiSports, competitionsCibles, estLanceEnLigneDeCommande, obtenirSportFootball, pause } from './lib/football.js';
 
-const prisma = new PrismaClient();
+// Importe le catalogue des compétitions ciblées dans la base.
+// Rattrape aussi les compétitions créées avant l'ajout de la colonne api_id
+// (retrouvées par nom, puis mises à jour avec leur ID API).
+export async function importerCatalogue() {
+    console.log("⏳ Début de l'importation du catalogue...");
+    const football = await obtenirSportFootball();
 
-// 🎯 TA LISTE BLANCHE : Ajoute ou retire les IDs des tournois qui t'intéressent ici
-const competitionsCibles = [1, 2, 3, 4, 39, 61, 66, 78, 140];
+    for (const apiId of competitionsCibles) {
+        try {
+            const [donneesLigue] = await appelApiSports('leagues', { id: apiId });
+            if (!donneesLigue) {
+                console.log(`❌ Compétition ${apiId} introuvable sur l'API.`);
+                continue;
+            }
 
-// ⏱️ Fonction utilitaire pour mettre le script en pause (en millisecondes)
-const pause = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            const { name, logo } = donneesLigue.league;
 
-async function importerCatalogue() {
-  console.log("⏳ Début du processus d'importation multiple...");
+            const existante = await prisma.competition.findFirst({
+                where: { OR: [{ api_id: apiId }, { name }] },
+            });
 
-  try {
-    // 1. On vérifie que le sport Football existe
-    const football = await prisma.sport.findFirst({ where: { name: 'Football' } });
-    if (!football) {
-      console.log("❌ Le sport 'Football' n'existe pas dans la base !");
-      return;
+            if (!existante) {
+                await prisma.competition.create({
+                    data: { api_id: apiId, name, logo_url: logo, sport_id: football.sport_id },
+                });
+                console.log(`🎉 "${name}" ajoutée au catalogue.`);
+            } else if (existante.api_id !== apiId) {
+                await prisma.competition.update({
+                    where: { competition_id: existante.competition_id },
+                    data: { api_id: apiId, logo_url: logo },
+                });
+                console.log(`🔗 "${name}" reliée à son ID API (${apiId}).`);
+            } else {
+                console.log(`✅ "${name}" déjà dans la base.`);
+            }
+
+            await pause(6500); // Limite du plan gratuit : 10 appels/minute
+        } catch (erreur) {
+            console.error(`❌ Erreur sur la compétition ${apiId}:`, erreur.message);
+        }
     }
-
-    // 2. On boucle sur chaque ID de ta liste
-    for (const api_id of competitionsCibles) {
-      console.log(`\n🌍 Recherche de la compétition ID : ${api_id}...`);
-      
-      const reponseAPI = await axios.get(`https://v3.football.api-sports.io/leagues?id=${api_id}`, {
-        headers: { 'x-apisports-key': process.env.API_SPORTS_KEY }
-      });
-
-      const donneesAPI = reponseAPI.data.response[0];
-      if (!donneesAPI) {
-        console.log(`❌ Compétition ${api_id} introuvable sur l'API.`);
-        continue; // S'il y a une erreur, on passe directement au tournoi suivant
-      }
-
-      const nomCompetition = donneesAPI.league.name;
-      const logoCompetition = donneesAPI.league.logo;
-      
-      // 3. On vérifie si elle existe déjà dans ta base Neon
-      const competitionExistante = await prisma.competition.findFirst({
-        where: { name: nomCompetition }
-      });
-
-      if (competitionExistante) {
-        console.log(`   ✅ "${nomCompetition}" est DÉJÀ dans ta base. On l'ignore.`);
-      } else {
-        // 4. On l'insère !
-        await prisma.competition.create({
-          data: {
-            name: nomCompetition,
-            logo_url: logoCompetition,
-            sport_id: football.sport_id
-          }
-        });
-        console.log(`   🎉 SUCCÈS ! "${nomCompetition}" a été ajoutée à ton catalogue.`);
-      }
-
-      // ⏱️ On attend 1,5 seconde avant de demander le tournoi suivant pour ne pas froisser l'API
-      await pause(1500); 
-    }
-
-    console.log("\n🏁 Importation du catalogue terminée avec succès !");
-
-  } catch (erreur) {
-    console.error("❌ Une erreur est survenue :", erreur.message);
-  } finally {
-    await prisma.$disconnect();
-  }
+    console.log('🏁 Importation du catalogue terminée.');
 }
 
-importerCatalogue();
+if (estLanceEnLigneDeCommande(import.meta.url)) {
+    importerCatalogue().finally(() => prisma.$disconnect());
+}

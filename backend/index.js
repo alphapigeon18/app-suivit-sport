@@ -1,15 +1,12 @@
 import 'dotenv/config';
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
 import cors from 'cors';
-import cron from 'node-cron';
-import { exec } from 'node:child_process';
-import { promisify } from 'util';
+import prisma from './lib/prisma.js';
+import { initialiserCalendrier } from './init-calendrier.js';
+import { majQuotidienne } from './maj-quotidienne.js';
 
 // Initialisation
 const app = express();
-const prisma = new PrismaClient();
-const execPromise = promisify(exec);
 const port = process.env.PORT || 3000;
 
 // Middlewares
@@ -17,22 +14,33 @@ app.use(express.json());
 app.use(cors());
 
 // ============================================================================
-// ⚙️ FONCTION DE LANCEMENT DES SCRIPTS
+// ⚙️ JOB QUOTIDIEN (déclenché par cron-job.org via /cron-daily)
 // ============================================================================
+let jobEnCours = false;
+
 async function runDailyJobs() {
-    console.log(`\n🔄 [${new Date().toLocaleTimeString()}] Début du cycle de mise à jour...`);
-    const scripts = ['maj-competitions.js', 'init-calendrier.js', 'maj-quotidienne.js'];
-    
-    for (const script of scripts) {
+    if (jobEnCours) {
+        console.log('⏭️ Un cycle est déjà en cours, on ignore ce déclenchement.');
+        return;
+    }
+    jobEnCours = true;
+    console.log(`\n🔄 [${new Date().toISOString()}] Début du cycle de mise à jour...`);
+
+    const etapes = [
+        ['Calendrier complet', initialiserCalendrier],
+        ['MAJ quotidienne', majQuotidienne],
+    ];
+
+    for (const [nom, etape] of etapes) {
         try {
-            console.log(`▶️ Lancement de : ${script}`);
-            await execPromise(`node ${script}`);
-            console.log(`✅ Succès : ${script}`);
-        } catch (e) {
-            console.error(`❌ Erreur critique sur ${script}:`, e.message);
+            await etape();
+        } catch (erreur) {
+            console.error(`❌ Erreur critique sur "${nom}":`, erreur.message);
         }
     }
-    console.log("🏁 Cycle autonome terminé.");
+
+    jobEnCours = false;
+    console.log('🏁 Cycle terminé.');
 }
 
 // ============================================================================
@@ -43,30 +51,74 @@ app.get('/', (req, res) => {
     res.send('Serveur opérationnel !');
 });
 
-// Route dédiée au déclenchement manuel (utilisée par cron-job.org)
-app.get('/cron-daily', async (req, res) => {
-    console.log("🚀 Déclenchement manuel du job quotidien...");
-    await runDailyJobs();
-    res.status(200).send("Job quotidien terminé avec succès");
+// Déclenchement du job quotidien (appelé par cron-job.org).
+// Protégé par un token (variable d'environnement CRON_SECRET).
+app.get('/cron-daily', (req, res) => {
+    const secret = process.env.CRON_SECRET;
+    if (secret) {
+        const tokenRecu = req.query.token || req.get('x-cron-token');
+        if (tokenRecu !== secret) {
+            return res.status(403).send('Accès refusé.');
+        }
+    }
+
+    // On répond tout de suite (cron-job.org a un timeout court),
+    // le cycle continue en arrière-plan.
+    res.status(202).send('Job quotidien lancé.');
+    runDailyJobs();
 });
 
-// Exemple de route pour tes compétitions
+// Liste des compétitions (page d'accueil)
 app.get('/competitions', async (req, res) => {
     try {
         const competitions = await prisma.competition.findMany({
-            orderBy: { name: 'asc' }
+            orderBy: { name: 'asc' },
         });
         res.json(competitions);
-    } catch (error) {
-        res.status(500).json({ erreur: "Erreur lors de la récupération." });
+    } catch (erreur) {
+        console.error('❌ /competitions :', erreur.message);
+        res.status(500).json({ erreur: 'Erreur lors de la récupération.' });
     }
 });
 
-// ============================================================================
-// ⏱️ CRON JOB AUTOMATIQUE (Tous les jours à 4h00 du matin)
-// ============================================================================
-cron.schedule('0 4 * * *', async () => {
-    await runDailyJobs();
+// Détail d'une compétition : infos, saisons et tous les matchs (page détail)
+app.get('/competitions/:id/matchs', async (req, res) => {
+    try {
+        const ligue = await prisma.competition.findUnique({
+            where: { competition_id: req.params.id },
+        });
+        if (!ligue) {
+            return res.status(404).json({ erreur: 'Compétition introuvable.' });
+        }
+
+        const saisons = await prisma.season.findMany({
+            where: { competition_id: ligue.competition_id },
+            orderBy: { year_label: 'desc' },
+        });
+
+        const matchsBruts = await prisma.match.findMany({
+            where: { season: { competition_id: ligue.competition_id } },
+            include: {
+                team_match_home_team_idToteam: true,
+                team_match_away_team_idToteam: true,
+            },
+            orderBy: { start_time: 'asc' },
+        });
+
+        // On renomme les relations Prisma en home_team / away_team pour le frontend
+        const matchs = matchsBruts.map(
+            ({ team_match_home_team_idToteam: home_team, team_match_away_team_idToteam: away_team, ...match }) => ({
+                ...match,
+                home_team,
+                away_team,
+            })
+        );
+
+        res.json({ ligue, saisons, matchs });
+    } catch (erreur) {
+        console.error('❌ /competitions/:id/matchs :', erreur.message);
+        res.status(500).json({ erreur: 'Erreur lors de la récupération.' });
+    }
 });
 
 // ============================================================================
@@ -74,4 +126,7 @@ cron.schedule('0 4 * * *', async () => {
 // ============================================================================
 app.listen(port, () => {
     console.log(`🚀 Serveur backend lancé sur le port ${port}`);
+    if (!process.env.CRON_SECRET) {
+        console.warn('⚠️ CRON_SECRET non défini : /cron-daily est accessible sans token !');
+    }
 });

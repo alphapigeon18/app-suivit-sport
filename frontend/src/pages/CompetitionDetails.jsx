@@ -5,7 +5,7 @@ import { API_BASE_URL } from '../config';
 
 
 const traductionsPhase = { "Round of 16": "Huitièmes de finale", "Quarter-finals": "Quarts de finale", "Semi-finals": "Demi-finales", "Final": "Finale", "3rd Place Final": "Troisième place" };
-const traductionsStatut = { "FINISHED": "Terminé", "LIVE": "En direct", "SCHEDULED": "À venir", "POSTPONED": "Reporté" };
+const traductionsStatut = { "FINISHED": "Terminé", "IN_PLAY": "En direct", "SCHEDULED": "À venir", "POSTPONED": "Reporté" };
 const traduirePhase = (p) => traductionsPhase[p] || p;
 const traduireStatut = (s) => traductionsStatut[s] || s;
 
@@ -162,7 +162,7 @@ function CompetitionDetails() {
           <span>{new Date(m.start_time).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}</span>
           <div className="flex gap-2 items-center">
             {hasPenalties && <span className="text-orange-500 bg-orange-50 px-2 py-1 rounded-md">TAB ({m.home_penalty}-{m.away_penalty})</span>}
-            <span className={`px-2 py-1 rounded-md ${m.status === 'LIVE' ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-gray-100 text-gray-600'}`}>{traduireStatut(m.status)}</span>
+            <span className={`px-2 py-1 rounded-md ${m.status === 'IN_PLAY' ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-gray-100 text-gray-600'}`}>{traduireStatut(m.status)}</span>
           </div>
         </div>
         <div className="space-y-3">

@@ -9,6 +9,7 @@ datasource db {
 
 model competition {
   competition_id String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  api_id         Int?           @unique
   sport_id       String         @db.Uuid
   name           String         @db.VarChar(255)
   logo_url       String?
@@ -25,8 +26,8 @@ model match {
   away_team_id                  String       @db.Uuid
   start_time                    DateTime     @db.Timestamptz(6)
   status                        match_status @default(SCHEDULED)
-  home_score                    Int?         @default(0)
-  away_score                    Int?         @default(0)
+  home_score                    Int?
+  away_score                    Int?
   home_penalty                  Int?
   away_penalty                  Int?
   home_winner                   Boolean?
@@ -57,6 +58,7 @@ model sport {
 
 model team {
   team_id                        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  api_id                         Int?    @unique
   name                           String  @db.VarChar(255)
   logo_url                       String?
   sport_id  String  @db.Uuid 
