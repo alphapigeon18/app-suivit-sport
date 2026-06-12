@@ -104,10 +104,11 @@ export async function obtenirEquipe(equipeApi, sportId) {
 
 // Retrouve un match créé par l'autre source de données : même saison et même
 // coup d'envoi, départagé par le nom de l'équipe à domicile s'il y a plusieurs
-// matchs simultanés.
-export async function trouverMatchCroise(seasonId, startTime, nomEquipeDomicile) {
+// matchs simultanés. Le filtre exclut les matchs déjà liés à la source en cours
+// (ex. { fd_id: null }) pour ne jamais fusionner deux matchs d'une même source.
+export async function trouverMatchCroise(seasonId, startTime, nomEquipeDomicile, filtre) {
     const candidats = await prisma.match.findMany({
-        where: { season_id: seasonId, start_time: startTime },
+        where: { season_id: seasonId, start_time: startTime, ...filtre },
         include: { team_match_home_team_idToteam: true },
     });
     if (candidats.length === 0) return null;
@@ -172,7 +173,7 @@ export async function upsertMatch(matchDonnees, saison, sportId, equipeMystere) 
         return prisma.match.update({ where: { match_id: dejaConnu.match_id }, data });
     }
 
-    const matchCroise = await trouverMatchCroise(saison.season_id, startTime, matchDonnees.teams.home?.name);
+    const matchCroise = await trouverMatchCroise(saison.season_id, startTime, matchDonnees.teams.home?.name, { api_id: null });
     if (matchCroise) {
         return prisma.match.update({
             where: { match_id: matchCroise.match_id },

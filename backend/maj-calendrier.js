@@ -89,7 +89,7 @@ export async function majCalendrier() {
                 // (même saison + même coup d'envoi) ; sinon, on le crée.
                 let existant = await prisma.match.findUnique({ where: { fd_id: matchFd.id } });
                 if (!existant) {
-                    existant = await trouverMatchCroise(saison.season_id, startTime, matchFd.homeTeam?.name);
+                    existant = await trouverMatchCroise(saison.season_id, startTime, matchFd.homeTeam?.name, { fd_id: null });
                 }
 
                 if (existant) {
