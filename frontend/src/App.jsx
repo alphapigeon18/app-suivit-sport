@@ -4,7 +4,8 @@ import CompetitionDetails from './pages/CompetitionDetails';
 
 function App() {
   return (
-    <Router>
+    // basename : '/' en local, '/app-suivit-sport' sur GitHub Pages
+    <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
       <Routes>
         {/* La page d'accueil (Le tableau de bord avec les cartes) */}
         <Route path="/" element={<Home />} />
