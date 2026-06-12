@@ -57,20 +57,41 @@ export async function obtenirEquipeMystere(sportId) {
     return equipe;
 }
 
-// Retrouve une équipe par son ID API (avec rattrapage par nom pour les équipes
-// créées avant l'ajout de la colonne api_id), ou la crée.
+// Normalise un nom d'équipe pour comparer les deux sources de données
+// (ex. "Paris Saint Germain" / "Paris Saint-Germain FC" → "parissaintgermain")
+export function normaliserNomEquipe(nom) {
+    return (nom || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '') // accents (supprime les diacritiques apres normalize NFD)
+        .replace(/\b(fc|afc|cf|sc|ac|as|ssc|rc|cd|sd|ud|sv|vfb|vfl|tsg|bsc|club|de)\b/g, '')
+        .replace(/[^a-z0-9]/g, '');
+}
+
+// Cherche une équipe existante dont le nom normalisé correspond
+export async function trouverEquipeParNom(nom) {
+    const exacte = await prisma.team.findFirst({ where: { name: nom } });
+    if (exacte) return exacte;
+
+    const cible = normaliserNomEquipe(nom);
+    if (!cible) return null;
+    const toutes = await prisma.team.findMany();
+    return toutes.find((t) => normaliserNomEquipe(t.name) === cible) || null;
+}
+
+// Retrouve une équipe par son ID API-Sports (avec rattrapage par nom pour les
+// équipes créées par football-data ou avant l'ajout de la colonne api_id), ou la crée.
 export async function obtenirEquipe(equipeApi, sportId) {
     if (!equipeApi?.id || !equipeApi?.name) return null;
 
-    const existante = await prisma.team.findFirst({
-        where: { OR: [{ api_id: equipeApi.id }, { name: equipeApi.name }] },
-    });
+    let existante = await prisma.team.findUnique({ where: { api_id: equipeApi.id } });
+    if (!existante) existante = await trouverEquipeParNom(equipeApi.name);
 
     if (existante) {
         if (existante.api_id !== equipeApi.id) {
             return prisma.team.update({
                 where: { team_id: existante.team_id },
-                data: { api_id: equipeApi.id, logo_url: equipeApi.logo },
+                data: { api_id: equipeApi.id, logo_url: existante.logo_url || equipeApi.logo },
             });
         }
         return existante;
@@ -79,6 +100,20 @@ export async function obtenirEquipe(equipeApi, sportId) {
     return prisma.team.create({
         data: { api_id: equipeApi.id, name: equipeApi.name, logo_url: equipeApi.logo, sport_id: sportId },
     });
+}
+
+// Retrouve un match créé par l'autre source de données : même saison et même
+// coup d'envoi, départagé par le nom de l'équipe à domicile s'il y a plusieurs
+// matchs simultanés.
+export async function trouverMatchCroise(seasonId, startTime, nomEquipeDomicile) {
+    const candidats = await prisma.match.findMany({
+        where: { season_id: seasonId, start_time: startTime },
+        include: { team_match_home_team_idToteam: true },
+    });
+    if (candidats.length === 0) return null;
+    if (candidats.length === 1) return candidats[0];
+    const cible = normaliserNomEquipe(nomEquipeDomicile);
+    return candidats.find((c) => normaliserNomEquipe(c.team_match_home_team_idToteam.name) === cible) || null;
 }
 
 // Retrouve (ou crée) la saison d'une compétition pour une année donnée
@@ -95,24 +130,22 @@ export async function obtenirSaison(competitionId, anneeSaison) {
     return saison;
 }
 
-// Crée ou met à jour un match à partir des données brutes de l'API
+// Crée ou met à jour un match à partir des données brutes d'API-Sports.
+// Si le match a été créé par football-data (calendrier), on le retrouve par
+// saison + coup d'envoi et on ne met à jour que le déroulé (scores, statut,
+// buteurs) : football-data reste la référence pour les équipes et la phase.
 export async function upsertMatch(matchDonnees, saison, sportId, equipeMystere) {
     const buteurs = (matchDonnees.events || [])
         .filter((e) => e.type === 'Goal')
         .map((e) => ({ joueur: e.player.name, minute: e.time.elapsed, equipe: e.team.name }));
 
-    const eqDom = (await obtenirEquipe(matchDonnees.teams.home, sportId)) || equipeMystere;
-    const eqExt = (await obtenirEquipe(matchDonnees.teams.away, sportId)) || equipeMystere;
+    const api_id = matchDonnees.fixture.id.toString();
+    const startTime = new Date(matchDonnees.fixture.date);
 
-    const donneesMatch = {
-        season_id: saison.season_id,
-        home_team_id: eqDom.team_id,
-        away_team_id: eqExt.team_id,
-        start_time: new Date(matchDonnees.fixture.date),
+    const donneesDeroule = {
         status: determinerStatutMatch(matchDonnees.fixture.status.short),
         home_score: matchDonnees.goals.home ?? null,
         away_score: matchDonnees.goals.away ?? null,
-        phase: matchDonnees.league.round,
         home_penalty: matchDonnees.score?.penalty?.home ?? null,
         away_penalty: matchDonnees.score?.penalty?.away ?? null,
         home_winner: matchDonnees.teams.home?.winner ?? null,
@@ -120,13 +153,46 @@ export async function upsertMatch(matchDonnees, saison, sportId, equipeMystere) 
         events: buteurs,
     };
 
-    const api_id = matchDonnees.fixture.id.toString();
-    const resultat = await prisma.match.upsert({
-        where: { api_id },
-        create: { api_id, ...donneesMatch },
-        update: donneesMatch,
+    const dejaConnu = await prisma.match.findUnique({ where: { api_id } });
+    if (dejaConnu) {
+        const data = { ...donneesDeroule };
+        // Si le match n'est pas suivi par football-data, API-Sports gère aussi
+        // le calendrier (équipes, horaire, phase)
+        if (!dejaConnu.fd_id) {
+            const eqDom = (await obtenirEquipe(matchDonnees.teams.home, sportId)) || equipeMystere;
+            const eqExt = (await obtenirEquipe(matchDonnees.teams.away, sportId)) || equipeMystere;
+            Object.assign(data, {
+                season_id: saison.season_id,
+                home_team_id: eqDom.team_id,
+                away_team_id: eqExt.team_id,
+                start_time: startTime,
+                phase: matchDonnees.league.round,
+            });
+        }
+        return prisma.match.update({ where: { match_id: dejaConnu.match_id }, data });
+    }
+
+    const matchCroise = await trouverMatchCroise(saison.season_id, startTime, matchDonnees.teams.home?.name);
+    if (matchCroise) {
+        return prisma.match.update({
+            where: { match_id: matchCroise.match_id },
+            data: { api_id, ...donneesDeroule },
+        });
+    }
+
+    const eqDom = (await obtenirEquipe(matchDonnees.teams.home, sportId)) || equipeMystere;
+    const eqExt = (await obtenirEquipe(matchDonnees.teams.away, sportId)) || equipeMystere;
+    return prisma.match.create({
+        data: {
+            api_id,
+            ...donneesDeroule,
+            season_id: saison.season_id,
+            home_team_id: eqDom.team_id,
+            away_team_id: eqExt.team_id,
+            start_time: startTime,
+            phase: matchDonnees.league.round,
+        },
     });
-    return resultat;
 }
 
 // Permet de garder les scripts exécutables en ligne de commande (node script.js)

@@ -4,7 +4,7 @@ import { API_BASE_URL } from '../config';
 
 
 
-const traductionsPhase = { "Round of 16": "Huitièmes de finale", "Quarter-finals": "Quarts de finale", "Semi-finals": "Demi-finales", "Final": "Finale", "3rd Place Final": "Troisième place" };
+const traductionsPhase = { "Round of 64": "64èmes de finale", "Round of 32": "Seizièmes de finale", "Round of 16": "Huitièmes de finale", "Play-offs": "Barrages", "Quarter-finals": "Quarts de finale", "Semi-finals": "Demi-finales", "Final": "Finale", "3rd Place Final": "Troisième place" };
 const traductionsStatut = { "FINISHED": "Terminé", "IN_PLAY": "En direct", "SCHEDULED": "À venir", "POSTPONED": "Reporté" };
 const traduirePhase = (p) => traductionsPhase[p] || p;
 const traduireStatut = (s) => traductionsStatut[s] || s;
@@ -49,7 +49,7 @@ function CompetitionDetails() {
     
     const poules = {};
     const arbre = {};
-    const ordrePhases = ["Huitièmes de finale", "Quarts de finale", "Demi-finales", "Troisième place", "Finale"];
+    const ordrePhases = ["64èmes de finale", "Seizièmes de finale", "Barrages", "Huitièmes de finale", "Quarts de finale", "Demi-finales", "Troisième place", "Finale"];
 
     const matchsGroupesBruts = [];
     
@@ -159,7 +159,11 @@ function CompetitionDetails() {
     return (
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-all min-w-[260px]">
         <div className="flex justify-between items-center text-xs text-gray-400 font-bold mb-3 border-b border-gray-50 pb-2">
-          <span>{new Date(m.start_time).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}</span>
+          <span>
+            {new Date(m.start_time).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+            <span className="ml-1 text-gray-300">•</span>
+            <span className="ml-1">{new Date(m.start_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+          </span>
           <div className="flex gap-2 items-center">
             {hasPenalties && <span className="text-orange-500 bg-orange-50 px-2 py-1 rounded-md">TAB ({m.home_penalty}-{m.away_penalty})</span>}
             <span className={`px-2 py-1 rounded-md ${m.status === 'IN_PLAY' ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-gray-100 text-gray-600'}`}>{traduireStatut(m.status)}</span>

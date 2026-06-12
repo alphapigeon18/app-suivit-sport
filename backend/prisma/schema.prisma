@@ -10,6 +10,7 @@ datasource db {
 model competition {
   competition_id String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   api_id         Int?           @unique
+  fd_id          Int?           @unique
   sport_id       String         @db.Uuid
   name           String         @db.VarChar(255)
   logo_url       String?
@@ -20,7 +21,8 @@ model competition {
 
 model match {
   match_id                      String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  api_id                        String       @unique @db.VarChar(100)
+  api_id                        String?      @unique @db.VarChar(100)
+  fd_id                         Int?         @unique
   season_id                     String       @db.Uuid
   home_team_id                  String       @db.Uuid
   away_team_id                  String       @db.Uuid
@@ -59,6 +61,7 @@ model sport {
 model team {
   team_id                        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   api_id                         Int?    @unique
+  fd_id                          Int?    @unique
   name                           String  @db.VarChar(255)
   logo_url                       String?
   sport_id  String  @db.Uuid 

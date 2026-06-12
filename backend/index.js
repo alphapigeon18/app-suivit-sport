@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import prisma from './lib/prisma.js';
-import { initialiserCalendrier } from './init-calendrier.js';
+import { majCalendrier } from './maj-calendrier.js';
 import { majQuotidienne } from './maj-quotidienne.js';
 
 // Initialisation
@@ -27,8 +27,8 @@ async function runDailyJobs() {
     console.log(`\n🔄 [${new Date().toISOString()}] Début du cycle de mise à jour...`);
 
     const etapes = [
-        ['Calendrier complet', initialiserCalendrier],
-        ['MAJ quotidienne', majQuotidienne],
+        ['Calendrier complet (football-data)', majCalendrier],
+        ['MAJ quotidienne (API-Sports)', majQuotidienne],
     ];
 
     for (const [nom, etape] of etapes) {
