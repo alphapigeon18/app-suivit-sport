@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '@/config';
+import NotificationButton from '@/components/NotificationButton';
 
 function Home() {
   const [competitions, setCompetitions] = useState([]);
@@ -42,6 +43,7 @@ function Home() {
             Calendriers, scores et classements des grandes compétitions sportives,
             mis à jour en continu.
           </p>
+          <NotificationButton />
         </div>
       </header>
 

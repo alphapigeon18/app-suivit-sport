@@ -4,6 +4,7 @@ import cors from 'cors';
 import prisma from './lib/prisma.js';
 import { majCalendrier } from './maj-calendrier.js';
 import { majQuotidienne } from './maj-quotidienne.js';
+import { notifierMatchsTermines, envoyerATous } from './lib/notifications.js';
 
 // Initialisation
 const app = express();
@@ -66,17 +67,23 @@ async function executerCycle() {
                 console.error('❌ Erreur sur la MAJ quotidienne (API-Sports) :', erreur.message);
             }
             console.log('🏁 Cycle complet terminé.');
-            return;
+        } else {
+            const actifs = await matchsEnCoursOuImminents();
+            if (actifs > 0) {
+                console.log(`⚽ ${actifs} match(s) en cours ou imminent(s) : rafraîchissement des scores...`);
+                try {
+                    await majQuotidienne();
+                } catch (erreur) {
+                    console.error('❌ Erreur sur le rafraîchissement live :', erreur.message);
+                }
+            }
         }
 
-        const actifs = await matchsEnCoursOuImminents();
-        if (actifs > 0) {
-            console.log(`⚽ ${actifs} match(s) en cours ou imminent(s) : rafraîchissement des scores...`);
-            try {
-                await majQuotidienne();
-            } catch (erreur) {
-                console.error('❌ Erreur sur le rafraîchissement live :', erreur.message);
-            }
+        // Après toute mise à jour, on notifie les matchs qui viennent de se terminer
+        try {
+            await notifierMatchsTermines();
+        } catch (erreur) {
+            console.error('❌ Erreur notifications fin de match :', erreur.message);
         }
     } finally {
         jobEnCours = false;
@@ -159,6 +166,66 @@ app.get('/competitions/:id/matchs', async (req, res) => {
         console.error('❌ /competitions/:id/matchs :', erreur.message);
         res.status(500).json({ erreur: 'Erreur lors de la récupération.' });
     }
+});
+
+// ============================================================================
+// 🔔 NOTIFICATIONS PUSH (Web Push natif)
+// ============================================================================
+
+// Clé publique VAPID (le frontend en a besoin pour s'abonner)
+app.get('/notifications/vapid-public-key', (req, res) => {
+    const cle = process.env.VAPID_PUBLIC_KEY;
+    if (!cle) return res.status(503).json({ erreur: 'Notifications non configurées.' });
+    res.json({ publicKey: cle });
+});
+
+// Enregistre l'abonnement d'un appareil
+app.post('/notifications/subscribe', async (req, res) => {
+    try {
+        const sub = req.body;
+        if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
+            return res.status(400).json({ erreur: 'Abonnement invalide.' });
+        }
+        await prisma.push_subscription.upsert({
+            where: { endpoint: sub.endpoint },
+            create: { endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+            update: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+        });
+        res.status(201).json({ ok: true });
+    } catch (erreur) {
+        console.error('❌ /notifications/subscribe :', erreur.message);
+        res.status(500).json({ erreur: 'Erreur abonnement.' });
+    }
+});
+
+// Supprime l'abonnement d'un appareil
+app.post('/notifications/unsubscribe', async (req, res) => {
+    try {
+        const { endpoint } = req.body;
+        if (endpoint) await prisma.push_subscription.deleteMany({ where: { endpoint } });
+        res.json({ ok: true });
+    } catch (erreur) {
+        console.error('❌ /notifications/unsubscribe :', erreur.message);
+        res.status(500).json({ erreur: 'Erreur désabonnement.' });
+    }
+});
+
+// Envoi d'une notification de test à tous les abonnés (protégé par token)
+app.post('/notifications/test', async (req, res) => {
+    const secret = process.env.CRON_SECRET;
+    if (secret) {
+        const token = req.query.token || req.get('x-cron-token');
+        if (token !== secret) return res.status(403).send('Accès refusé.');
+    }
+    const base = (process.env.FRONTEND_URL || 'https://alphapigeon18.github.io/app-suivit-sport').replace(/\/$/, '');
+    const resultat = await envoyerATous({
+        title: '🏆 SuiviSport',
+        body: 'Notification de test — tout fonctionne !',
+        url: base,
+        icon: `${base}/pwa-192x192.png`,
+        badge: `${base}/pwa-192x192.png`,
+    });
+    res.json(resultat);
 });
 
 // ============================================================================
