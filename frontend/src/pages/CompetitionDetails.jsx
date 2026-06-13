@@ -25,15 +25,16 @@ const traduirePhase = (p) => {
 };
 const traduireStatut = (s) => traductionsStatut[s] || s;
 
-// Tri des phases de l'arbre : journées en ordre numérique, puis phases finales
-const comparerPhases = (a, b) => {
-  const ja = /^Journée (\d+)$/.exec(a);
-  const jb = /^Journée (\d+)$/.exec(b);
-  if (ja && jb) return Number(ja[1]) - Number(jb[1]);
-  if (ja) return -1;
-  if (jb) return 1;
-  return ordrePhases.indexOf(a) - ordrePhases.indexOf(b);
+const estPhaseFinale = (phaseTrad) => ordrePhases.includes(phaseTrad);
+
+// Tri des journées par numéro
+const comparerJournees = (a, b) => {
+  const na = Number(/(\d+)/.exec(a)?.[1] ?? 1e9);
+  const nb = Number(/(\d+)/.exec(b)?.[1] ?? 1e9);
+  return na - nb;
 };
+
+const parDate = (a, b) => new Date(a.start_time) - new Date(b.start_time);
 
 // ============================================================================
 // 🛡️ LOGO D'ÉQUIPE (avec remplacement propre si logo absent ou cassé)
@@ -158,6 +159,119 @@ function CarteMatch({ m }) {
 }
 
 // ============================================================================
+// 🏆 TABLEAU DE CLASSEMENT (groupe compact ou ligue complète)
+// ============================================================================
+function genererClassement(matchsDuGroupe) {
+  if (!matchsDuGroupe) return [];
+  const stats = {};
+  matchsDuGroupe.forEach((m) => {
+    if (!m.home_team || !m.away_team) return;
+    for (const t of [m.home_team, m.away_team]) {
+      if (!stats[t.team_id]) {
+        stats[t.team_id] = { id: t.team_id, equipe: t, pts: 0, j: 0, v: 0, n: 0, d: 0, bp: 0, bc: 0 };
+      }
+    }
+    if (m.status === 'FINISHED' && m.home_score != null && m.away_score != null) {
+      const dom = stats[m.home_team.team_id];
+      const ext = stats[m.away_team.team_id];
+      dom.j += 1; ext.j += 1;
+      dom.bp += m.home_score; dom.bc += m.away_score;
+      ext.bp += m.away_score; ext.bc += m.home_score;
+      if (m.home_score > m.away_score) { dom.pts += 3; dom.v += 1; ext.d += 1; }
+      else if (m.home_score < m.away_score) { ext.pts += 3; ext.v += 1; dom.d += 1; }
+      else { dom.pts += 1; dom.n += 1; ext.pts += 1; ext.n += 1; }
+    }
+  });
+  return Object.values(stats)
+    .map((t) => ({ ...t, diff: t.bp - t.bc }))
+    .sort((a, b) => {
+      if (b.pts !== a.pts) return b.pts - a.pts;
+      if (b.diff !== a.diff) return b.diff - a.diff;
+      return b.bp - a.bp;
+    });
+}
+
+function Classement({ titre, lignes, compact = false, placesQualif = 0 }) {
+  return (
+    <div className="bg-white rounded-2xl ring-1 ring-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-slate-900 px-5 py-3.5 font-bold text-white text-sm">{titre}</div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm text-left">
+          <thead className="text-[11px] text-slate-400 uppercase tracking-wide border-b border-slate-100">
+            <tr>
+              <th className="px-4 py-2.5 font-bold">Équipe</th>
+              <th className="px-2 py-2.5 text-center font-bold">J</th>
+              {!compact && (
+                <>
+                  <th className="px-2 py-2.5 text-center font-bold">G</th>
+                  <th className="px-2 py-2.5 text-center font-bold">N</th>
+                  <th className="px-2 py-2.5 text-center font-bold">P</th>
+                </>
+              )}
+              <th className="px-2 py-2.5 text-center font-bold">+/-</th>
+              <th className="px-4 py-2.5 text-center font-bold text-emerald-600">Pts</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lignes.map((rang, index) => (
+              <tr key={rang.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
+                <td className="px-4 py-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className={`w-5 h-5 rounded-md text-[11px] font-extrabold flex items-center justify-center shrink-0 ${
+                        placesQualif > 0 && index < placesQualif ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'
+                      }`}
+                    >
+                      {index + 1}
+                    </span>
+                    <TeamLogo equipe={rang.equipe} taille="w-5 h-5" />
+                    <span className="font-semibold text-slate-800 truncate max-w-[160px]">{rang.equipe.name}</span>
+                  </div>
+                </td>
+                <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums">{rang.j}</td>
+                {!compact && (
+                  <>
+                    <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums">{rang.v}</td>
+                    <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums">{rang.n}</td>
+                    <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums">{rang.d}</td>
+                  </>
+                )}
+                <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums">{rang.diff > 0 ? `+${rang.diff}` : rang.diff}</td>
+                <td className="px-4 py-2.5 text-center font-extrabold text-slate-900 tabular-nums">{rang.pts}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 📅 COLONNES DE JOURNÉES (championnat / phase de ligue)
+// ============================================================================
+function ColonnesJournees({ journees, ordre }) {
+  return (
+    <div className="bg-white p-6 rounded-2xl ring-1 ring-slate-200 shadow-sm overflow-x-auto">
+      <div className="flex gap-8 min-w-max">
+        {ordre.map((phaseName) => (
+          <div key={phaseName} className="flex flex-col min-w-[260px]">
+            <h3 className="text-center text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-4 border-b-2 border-slate-100 pb-2">
+              {phaseName}
+            </h3>
+            <div className="flex flex-col gap-4">
+              {journees[phaseName].map((m) => (
+                <CarteMatch key={m.match_id} m={m} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // 📄 PAGE DÉTAIL D'UNE COMPÉTITION
 // ============================================================================
 function CompetitionDetails() {
@@ -170,7 +284,7 @@ function CompetitionDetails() {
   const [matchs, setMatchs] = useState([]);
   const [chargement, setChargement] = useState(true);
 
-  const [vueActive, setVueActive] = useState('groupes');
+  const [vueActive, setVueActive] = useState('classement'); // 'classement' | 'finale'
   const [groupeActif, setGroupeActif] = useState('');
 
   useEffect(() => {
@@ -190,28 +304,33 @@ function CompetitionDetails() {
   }, [id]);
 
   // ==========================================================================
-  // 🧠 RÉPARTITION DES MATCHS : poules / arbre
+  // 🧠 RÉPARTITION DES MATCHS : groupes / journées / phase finale
   // ==========================================================================
-  const { matchsPoules, matchsArbre, listeGroupes } = useMemo(() => {
+  const { groupes, journees, finale, listeGroupes } = useMemo(() => {
     const matchsDeLaSaison = saisonActive ? matchs.filter((m) => m.season_id === saisonActive) : matchs;
 
-    const poules = {};
-    const arbre = {};
+    const grp = {};
+    const jrn = {};
+    const fin = {};
     const matchsGroupesBruts = [];
 
-    // 1. Séparation groupes / arbre
+    // 1. Tri par nature de phase
     matchsDeLaSaison.forEach((m) => {
-      const phaseBrute = m.phase || 'Phase de Groupes';
-      if (phaseBrute.toLowerCase().includes('group')) {
+      const phaseBrute = m.phase || '';
+      const phaseTrad = traduirePhase(phaseBrute);
+      if (estPhaseFinale(phaseTrad)) {
+        if (!fin[phaseTrad]) fin[phaseTrad] = [];
+        fin[phaseTrad].push(m);
+      } else if (phaseBrute.toLowerCase().includes('group')) {
         matchsGroupesBruts.push(m);
       } else {
-        const pTrad = traduirePhase(phaseBrute);
-        if (!arbre[pTrad]) arbre[pTrad] = [];
-        arbre[pTrad].push(m);
+        const cle = phaseTrad || 'Journée 1';
+        if (!jrn[cle]) jrn[cle] = [];
+        jrn[cle].push(m);
       }
     });
 
-    // 2. Reconstruction des groupes par graphe de rencontres
+    // 2. Reconstruction des groupes lettrés (graphe des rencontres)
     const matriceRencontres = {};
     matchsGroupesBruts.forEach((m) => {
       const h = m.home_team?.team_id;
@@ -247,90 +366,68 @@ function CompetitionDetails() {
       }
     }
 
-    // 3. Rangement final
     matchsGroupesBruts.forEach((m) => {
       const phaseStr = m.phase || '';
       let vraiGroupe = phaseStr.includes(' - ')
         ? phaseStr.split(' - ')[0].replace('Group', 'Groupe')
         : equipeVersGroupe[m.home_team?.team_id];
       if (!vraiGroupe) vraiGroupe = 'Phase de Groupes';
-      if (!poules[vraiGroupe]) poules[vraiGroupe] = [];
-      poules[vraiGroupe].push(m);
+      if (!grp[vraiGroupe]) grp[vraiGroupe] = [];
+      grp[vraiGroupe].push(m);
     });
 
-    Object.keys(poules).forEach((g) => poules[g].sort((a, b) => new Date(a.start_time) - new Date(b.start_time)));
-    Object.keys(arbre).forEach((p) => arbre[p].sort((a, b) => new Date(a.start_time) - new Date(b.start_time)));
+    // 3. Tris
+    Object.keys(grp).forEach((g) => grp[g].sort(parDate));
+    Object.keys(fin).forEach((p) => fin[p].sort(parDate));
+    const journeesOrdonnees = Object.keys(jrn)
+      .sort(comparerJournees)
+      .reduce((obj, k) => ((obj[k] = jrn[k].sort(parDate)), obj), {});
 
     return {
-      matchsPoules: poules,
-      matchsArbre: Object.keys(arbre)
-        .sort(comparerPhases)
-        .reduce((obj, key) => {
-          obj[key] = arbre[key];
-          return obj;
-        }, {}),
-      listeGroupes: Object.keys(poules).sort(),
+      groupes: grp,
+      journees: journeesOrdonnees,
+      finale: fin,
+      listeGroupes: Object.keys(grp).sort(),
     };
   }, [matchs, saisonActive]);
+
+  // ==========================================================================
+  // Valeurs dérivées
+  // ==========================================================================
+  const aGroupes = listeGroupes.length > 0;
+  const ordreJournees = Object.keys(journees);
+  const aJournees = ordreJournees.length > 0;
+  const aClassement = aGroupes || aJournees;
+
+  const phasesTournoi = useMemo(
+    () =>
+      Object.keys(finale)
+        .filter((p) => p !== 'Troisième place')
+        .sort((a, b) => ordrePhases.indexOf(a) - ordrePhases.indexOf(b)),
+    [finale]
+  );
+  const troisiemePlace = finale['Troisième place'];
+  const aFinale = phasesTournoi.length > 0;
+
+  // Classement de la ligue (CL phase de ligue, championnats) = toutes les journées
+  const classementLigue = useMemo(
+    () => genererClassement(Object.values(journees).flat()),
+    [journees]
+  );
+  const classementGroupe = genererClassement(groupes[groupeActif]);
+
+  // Onglet par défaut selon ce qui existe
+  useEffect(() => {
+    if (!chargement) setVueActive(aFinale && !aClassement ? 'finale' : 'classement');
+  }, [chargement, saisonActive, aClassement, aFinale]);
 
   useEffect(() => {
     if (listeGroupes.length > 0) setGroupeActif(listeGroupes[0]);
   }, [listeGroupes, saisonActive]);
 
-  // Si pas de phase de groupes (championnats), on bascule sur l'autre vue
-  useEffect(() => {
-    if (!chargement) {
-      if (listeGroupes.length === 0 && Object.keys(matchsArbre).length > 0) setVueActive('arbre');
-      else if (listeGroupes.length > 0) setVueActive('groupes');
-    }
-  }, [chargement, saisonActive, listeGroupes.length]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ==========================================================================
-  // 🏆 CLASSEMENT D'UN GROUPE
-  // ==========================================================================
-  const genererClassement = (matchsDuGroupe) => {
-    if (!matchsDuGroupe) return [];
-    const stats = {};
-    matchsDuGroupe.forEach((m) => {
-      if (!m.home_team || !m.away_team) return;
-      for (const t of [m.home_team, m.away_team]) {
-        if (!stats[t.team_id]) {
-          stats[t.team_id] = { id: t.team_id, equipe: t, pts: 0, j: 0, v: 0, n: 0, d: 0, bp: 0, bc: 0 };
-        }
-      }
-      if (m.status === 'FINISHED') {
-        const dom = stats[m.home_team.team_id];
-        const ext = stats[m.away_team.team_id];
-        dom.j += 1; ext.j += 1;
-        dom.bp += m.home_score; dom.bc += m.away_score;
-        ext.bp += m.away_score; ext.bc += m.home_score;
-        if (m.home_score > m.away_score) { dom.pts += 3; dom.v += 1; ext.d += 1; }
-        else if (m.home_score < m.away_score) { ext.pts += 3; ext.v += 1; dom.d += 1; }
-        else { dom.pts += 1; dom.n += 1; ext.pts += 1; ext.n += 1; }
-      }
-    });
-    return Object.values(stats)
-      .map((t) => ({ ...t, diff: t.bp - t.bc }))
-      .sort((a, b) => {
-        if (b.pts !== a.pts) return b.pts - a.pts;
-        if (b.diff !== a.diff) return b.diff - a.diff;
-        return b.bp - a.bp;
-      });
-  };
-  const classementActuel = genererClassement(matchsPoules[groupeActif]);
-
-  // Découpage de l'arbre : journées (championnats) / tableau final / 3e place
-  const phasesArbre = Object.keys(matchsArbre);
-  const phasesTournoi = phasesArbre.filter((p) => ordrePhases.includes(p) && p !== 'Troisième place');
-  const phasesJournees = phasesArbre.filter((p) => !ordrePhases.includes(p));
-  const troisiemePlace = matchsArbre['Troisième place'];
-
-  // Réordonne chaque tour pour que les deux matchs d'origine soient alignés
-  // face à leur match du tour suivant (on retrouve les équipes du match
-  // suivant dans les matchs du tour précédent). Parcours de la finale vers
-  // le premier tour ; les matchs encore indéterminés restent en ordre de date.
+  // Réordonne chaque tour pour aligner les paires face à leur match suivant
   const roundsTournoi = useMemo(() => {
-    const rounds = phasesTournoi.map((p) => [...matchsArbre[p]]);
+    const rounds = phasesTournoi.map((p) => [...finale[p]]);
     const estConnue = (eq) => eq && eq.team_id && eq.name !== 'À déterminer';
 
     for (let k = rounds.length - 1; k > 0; k--) {
@@ -359,8 +456,9 @@ function CompetitionDetails() {
       rounds[k - 1] = ordonne;
     }
     return rounds;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchsArbre]);
+  }, [finale, phasesTournoi]);
+
+  const libelleClassement = aGroupes ? 'Phase de groupes' : 'Classement';
 
   // ==========================================================================
   // 🎨 RENDU
@@ -416,12 +514,12 @@ function CompetitionDetails() {
           </p>
         ) : (
           <div className="space-y-8">
-            {/* ===== Onglets ===== */}
-            {listeGroupes.length > 0 && phasesArbre.length > 0 && (
+            {/* ===== Onglets (si classement ET phase finale existent) ===== */}
+            {aClassement && aFinale && (
               <div className="inline-flex bg-white rounded-full p-1 ring-1 ring-slate-200 shadow-sm">
                 {[
-                  ['groupes', 'Phase de groupes'],
-                  ['arbre', 'Phase finale'],
+                  ['classement', libelleClassement],
+                  ['finale', 'Phase finale'],
                 ].map(([cle, label]) => (
                   <button
                     key={cle}
@@ -436,134 +534,85 @@ function CompetitionDetails() {
               </div>
             )}
 
-            {/* ===== Vue groupes ===== */}
-            {vueActive === 'groupes' && listeGroupes.length > 0 && (
-              <div className="flex flex-col lg:flex-row gap-8">
-                <div className="w-full lg:w-1/3 flex flex-col gap-5">
-                  {listeGroupes.length > 1 && (
-                    <div className="flex flex-wrap gap-2">
-                      {listeGroupes.map((groupe) => (
-                        <button
-                          key={groupe}
-                          onClick={() => setGroupeActif(groupe)}
-                          className={`w-9 h-9 text-sm font-extrabold rounded-xl transition-all ${
-                            groupeActif === groupe
-                              ? 'bg-slate-900 text-white shadow-md'
-                              : 'bg-white ring-1 ring-slate-200 text-slate-500 hover:ring-slate-400'
-                          }`}
-                        >
-                          {groupe.replace('Groupe ', '')}
-                        </button>
+            {/* ===== Vue CLASSEMENT ===== */}
+            {vueActive === 'classement' && aClassement && (
+              aGroupes ? (
+                /* --- Groupes lettrés (Coupe du Monde, Euro) --- */
+                <div className="flex flex-col lg:flex-row gap-8">
+                  <div className="w-full lg:w-1/3 flex flex-col gap-5">
+                    {listeGroupes.length > 1 && (
+                      <div className="flex flex-wrap gap-2">
+                        {listeGroupes.map((groupe) => (
+                          <button
+                            key={groupe}
+                            onClick={() => setGroupeActif(groupe)}
+                            className={`w-9 h-9 text-sm font-extrabold rounded-xl transition-all ${
+                              groupeActif === groupe
+                                ? 'bg-slate-900 text-white shadow-md'
+                                : 'bg-white ring-1 ring-slate-200 text-slate-500 hover:ring-slate-400'
+                            }`}
+                          >
+                            {groupe.replace('Groupe ', '')}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <Classement
+                      titre={<>Classement <span className="text-emerald-400">{groupeActif}</span></>}
+                      lignes={classementGroupe}
+                      compact
+                      placesQualif={2}
+                    />
+                  </div>
+
+                  <div className="w-full lg:w-2/3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {groupes[groupeActif]?.map((m) => (
+                        <CarteMatch key={m.match_id} m={m} />
                       ))}
                     </div>
-                  )}
-
-                  <div className="bg-white rounded-2xl ring-1 ring-slate-200 shadow-sm overflow-hidden">
-                    <div className="bg-slate-900 px-5 py-3.5 font-bold text-white text-sm">
-                      Classement <span className="text-emerald-400">{groupeActif}</span>
-                    </div>
-                    <table className="w-full text-sm text-left">
-                      <thead className="text-[11px] text-slate-400 uppercase tracking-wide border-b border-slate-100">
-                        <tr>
-                          <th className="px-4 py-2.5 font-bold">Équipe</th>
-                          <th className="px-2 py-2.5 text-center font-bold">J</th>
-                          <th className="px-2 py-2.5 text-center font-bold">+/-</th>
-                          <th className="px-4 py-2.5 text-center font-bold text-emerald-600">Pts</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {classementActuel.map((rang, index) => (
-                          <tr key={rang.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
-                            <td className="px-4 py-2.5">
-                              <div className="flex items-center gap-2.5">
-                                <span
-                                  className={`w-5 h-5 rounded-md text-[11px] font-extrabold flex items-center justify-center shrink-0 ${
-                                    index < 2 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'
-                                  }`}
-                                >
-                                  {index + 1}
-                                </span>
-                                <TeamLogo equipe={rang.equipe} taille="w-5 h-5" />
-                                <span className="font-semibold text-slate-800 truncate max-w-[110px]">{rang.equipe.name}</span>
-                              </div>
-                            </td>
-                            <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums">{rang.j}</td>
-                            <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums">
-                              {rang.diff > 0 ? `+${rang.diff}` : rang.diff}
-                            </td>
-                            <td className="px-4 py-2.5 text-center font-extrabold text-slate-900 tabular-nums">{rang.pts}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
                   </div>
                 </div>
-
-                <div className="w-full lg:w-2/3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {matchsPoules[groupeActif]?.map((m) => (
-                      <CarteMatch key={m.match_id} m={m} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ===== Vue arbre / journées ===== */}
-            {vueActive === 'arbre' && (
-              <div className="space-y-10">
-                {/* Journées (championnats, phase de ligue) */}
-                {phasesJournees.length > 0 && (
+              ) : (
+                /* --- Ligue unique (Champions League, championnats) --- */
+                <div className="space-y-8">
+                  <Classement titre="Classement" lignes={classementLigue} />
                   <section>
                     <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-4">Journées</h2>
-                    <div className="bg-white p-6 rounded-2xl ring-1 ring-slate-200 shadow-sm overflow-x-auto">
-                      <div className="flex gap-8 min-w-max">
-                        {phasesJournees.map((phaseName) => (
-                          <div key={phaseName} className="flex flex-col min-w-[260px]">
-                            <h3 className="text-center text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-4 border-b-2 border-slate-100 pb-2">
-                              {phaseName}
-                            </h3>
-                            <div className="flex flex-col gap-4">
-                              {matchsArbre[phaseName].map((m) => (
-                                <CarteMatch key={m.match_id} m={m} />
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <ColonnesJournees journees={journees} ordre={ordreJournees} />
                   </section>
-                )}
+                </div>
+              )
+            )}
 
-                {/* Tableau final connecté */}
-                {phasesTournoi.length > 0 && (
-                  <section>
-                    <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-4">Tableau final</h2>
-                    <div className="bg-white p-8 rounded-2xl ring-1 ring-slate-200 shadow-sm overflow-x-auto">
-                      <div className="bracket min-w-max">
-                        {phasesTournoi.map((phaseName, indexPhase) => (
-                          <div
-                            key={phaseName}
-                            className={`bracket-round w-[280px] ${indexPhase === phasesTournoi.length - 1 ? 'bracket-last' : ''}`}
-                          >
-                            <h3 className="text-center text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-4 border-b-2 border-slate-100 pb-2">
-                              {phaseName}
-                            </h3>
-                            <div className="bracket-items">
-                              {roundsTournoi[indexPhase].map((m) => (
-                                <div key={m.match_id} className="bracket-item">
-                                  <CarteMatch m={m} />
-                                </div>
-                              ))}
-                            </div>
+            {/* ===== Vue PHASE FINALE ===== */}
+            {vueActive === 'finale' && aFinale && (
+              <div className="space-y-10">
+                <section>
+                  <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-4">Tableau final</h2>
+                  <div className="bg-white p-8 rounded-2xl ring-1 ring-slate-200 shadow-sm overflow-x-auto">
+                    <div className="bracket min-w-max">
+                      {phasesTournoi.map((phaseName, indexPhase) => (
+                        <div
+                          key={phaseName}
+                          className={`bracket-round w-[280px] ${indexPhase === phasesTournoi.length - 1 ? 'bracket-last' : ''}`}
+                        >
+                          <h3 className="text-center text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-4 border-b-2 border-slate-100 pb-2">
+                            {phaseName}
+                          </h3>
+                          <div className="bracket-items">
+                            {roundsTournoi[indexPhase].map((m) => (
+                              <div key={m.match_id} className="bracket-item">
+                                <CarteMatch m={m} />
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))}
                     </div>
-                  </section>
-                )}
+                  </div>
+                </section>
 
-                {/* Petite finale */}
                 {troisiemePlace && (
                   <section>
                     <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-4">Troisième place</h2>
