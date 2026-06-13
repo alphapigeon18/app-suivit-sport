@@ -159,6 +159,130 @@ function CarteMatch({ m }) {
 }
 
 // ============================================================================
+// 🔀 CONFRONTATIONS (1 manche, ou aller-retour comme en Champions League)
+// ============================================================================
+const estEquipeConnue = (eq) => eq && eq.team_id && eq.name !== 'À déterminer';
+
+// Regroupe les matchs d'un tour : les deux manches d'une même affiche
+// (mêmes équipes) sont fusionnées en une seule confrontation.
+function construireTies(matchs) {
+  const parCle = new Map();
+  const ordre = [];
+  matchs.forEach((m) => {
+    if (estEquipeConnue(m.home_team) && estEquipeConnue(m.away_team)) {
+      const cle = [m.home_team.team_id, m.away_team.team_id].sort().join('|');
+      if (!parCle.has(cle)) {
+        const groupe = [];
+        parCle.set(cle, groupe);
+        ordre.push(groupe);
+      }
+      parCle.get(cle).push(m);
+    } else {
+      ordre.push([m]); // équipe inconnue (tour pas encore tiré) → confrontation seule
+    }
+  });
+  return ordre.map(finaliserTie);
+}
+
+function finaliserTie(legsBruts) {
+  const legs = [...legsBruts].sort(parDate);
+  const ref = legs[0];
+  const teamA = ref.home_team;
+  const teamB = ref.away_team;
+  const idA = teamA?.team_id;
+  const aScores = [];
+  const bScores = [];
+  let aggA = 0;
+  let aggB = 0;
+  let joue = false;
+  let enCours = false;
+  let tousFinis = true;
+
+  legs.forEach((l) => {
+    const aDom = l.home_team?.team_id === idA;
+    const sA = aDom ? l.home_score : l.away_score;
+    const sB = aDom ? l.away_score : l.home_score;
+    aScores.push(sA);
+    bScores.push(sB);
+    if (l.status === 'FINISHED' && sA != null && sB != null) {
+      aggA += sA;
+      aggB += sB;
+      joue = true;
+    }
+    if (l.status === 'IN_PLAY') enCours = true;
+    if (l.status !== 'FINISHED') tousFinis = false;
+  });
+
+  const statut = enCours ? 'IN_PLAY' : tousFinis ? 'FINISHED' : 'SCHEDULED';
+
+  let qualifie = null;
+  if (tousFinis) {
+    if (aggA > aggB) qualifie = 'A';
+    else if (aggB > aggA) qualifie = 'B';
+    else {
+      // Égalité au cumul → tirs au but de la dernière manche
+      const d = legs[legs.length - 1];
+      const aDom = d.home_team?.team_id === idA;
+      const pA = aDom ? d.home_penalty : d.away_penalty;
+      const pB = aDom ? d.away_penalty : d.home_penalty;
+      if (typeof pA === 'number' && typeof pB === 'number') qualifie = pA >= pB ? 'A' : 'B';
+    }
+  }
+
+  return {
+    id: ref.match_id,
+    teamA,
+    teamB,
+    scoreA: joue ? aggA : null,
+    scoreB: joue ? aggB : null,
+    aScores,
+    bScores,
+    legs,
+    deuxManches: legs.length > 1,
+    statut,
+    qualifie,
+  };
+}
+
+// Détail des manches d'une confrontation aller-retour
+function detailManches(tie) {
+  const manche = (i, label) => {
+    const a = tie.aScores[i];
+    const b = tie.bScores[i];
+    const joue = a != null && b != null && tie.legs[i]?.status === 'FINISHED';
+    return `${label} ${joue ? `${a}-${b}` : '–'}`;
+  };
+  let texte = `${manche(0, 'Aller')} · ${manche(1, 'Retour')}`;
+  const d = tie.legs[tie.legs.length - 1];
+  const idA = tie.teamA?.team_id;
+  const aDom = d?.home_team?.team_id === idA;
+  const pA = aDom ? d?.home_penalty : d?.away_penalty;
+  const pB = aDom ? d?.away_penalty : d?.home_penalty;
+  if (typeof pA === 'number' && typeof pB === 'number') texte += ` · t.a.b. ${pA}-${pB}`;
+  return texte;
+}
+
+// Carte d'une confrontation : 1 manche → carte de match classique ;
+// aller-retour → cumul des deux manches + qualifié en gras.
+function TieCard({ tie }) {
+  if (!tie.deuxManches) return <CarteMatch m={tie.legs[0]} />;
+  const fini = tie.statut === 'FINISHED';
+  return (
+    <div className="bg-white rounded-xl ring-1 ring-slate-200 shadow-sm hover:shadow-md hover:ring-slate-300 transition-all p-4 min-w-[240px]">
+      <div className="flex justify-between items-center gap-2 mb-2.5 pb-2 border-b border-slate-100">
+        <span className="text-xs font-semibold text-slate-400">Aller-retour</span>
+        <StatutChip statut={tie.statut} />
+      </div>
+      <LigneEquipe equipe={tie.teamA} score={tie.scoreA} gagnant={fini && tie.qualifie === 'A'} statut={tie.statut} />
+      <LigneEquipe equipe={tie.teamB} score={tie.scoreB} gagnant={fini && tie.qualifie === 'B'} statut={tie.statut} />
+      <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400 font-medium">
+        {detailManches(tie)}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // 🏆 TABLEAU DE CLASSEMENT (groupe compact ou ligue complète)
 // ============================================================================
 function genererClassement(matchsDuGroupe) {
@@ -203,9 +327,9 @@ function Classement({ titre, lignes, compact = false, placesQualif = 0 }) {
               <th className="px-2 py-2.5 text-center font-bold">J</th>
               {!compact && (
                 <>
-                  <th className="px-2 py-2.5 text-center font-bold">G</th>
-                  <th className="px-2 py-2.5 text-center font-bold">N</th>
-                  <th className="px-2 py-2.5 text-center font-bold">P</th>
+                  <th className="px-2 py-2.5 text-center font-bold hidden sm:table-cell">G</th>
+                  <th className="px-2 py-2.5 text-center font-bold hidden sm:table-cell">N</th>
+                  <th className="px-2 py-2.5 text-center font-bold hidden sm:table-cell">P</th>
                 </>
               )}
               <th className="px-2 py-2.5 text-center font-bold">+/-</th>
@@ -225,15 +349,15 @@ function Classement({ titre, lignes, compact = false, placesQualif = 0 }) {
                       {index + 1}
                     </span>
                     <TeamLogo equipe={rang.equipe} taille="w-5 h-5" />
-                    <span className="font-semibold text-slate-800 truncate max-w-[160px]">{rang.equipe.name}</span>
+                    <span className="font-semibold text-slate-800 truncate max-w-[96px] sm:max-w-[160px]">{rang.equipe.name}</span>
                   </div>
                 </td>
                 <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums">{rang.j}</td>
                 {!compact && (
                   <>
-                    <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums">{rang.v}</td>
-                    <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums">{rang.n}</td>
-                    <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums">{rang.d}</td>
+                    <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums hidden sm:table-cell">{rang.v}</td>
+                    <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums hidden sm:table-cell">{rang.n}</td>
+                    <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums hidden sm:table-cell">{rang.d}</td>
                   </>
                 )}
                 <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums">{rang.diff > 0 ? `+${rang.diff}` : rang.diff}</td>
@@ -425,24 +549,21 @@ function CompetitionDetails() {
     if (listeGroupes.length > 0) setGroupeActif(listeGroupes[0]);
   }, [listeGroupes, saisonActive]);
 
-  // Réordonne chaque tour pour aligner les paires face à leur match suivant
-  const roundsTournoi = useMemo(() => {
-    const rounds = phasesTournoi.map((p) => [...finale[p]]);
-    const estConnue = (eq) => eq && eq.team_id && eq.name !== 'À déterminer';
+  // Regroupe chaque tour en confrontations (aller-retour fusionnés) puis
+  // réordonne pour aligner chaque paire face à sa confrontation suivante.
+  const roundsTies = useMemo(() => {
+    const equipesTie = (t) => [t.teamA, t.teamB].filter(estEquipeConnue);
+    const rounds = phasesTournoi.map((p) => construireTies(finale[p]));
 
     for (let k = rounds.length - 1; k > 0; k--) {
       const courant = rounds[k - 1];
       const ordonne = [];
       const utilises = new Set();
 
-      for (const matchSuivant of rounds[k]) {
-        for (const equipe of [matchSuivant.home_team, matchSuivant.away_team]) {
-          if (!estConnue(equipe)) continue;
+      for (const tieSuivant of rounds[k]) {
+        for (const eq of equipesTie(tieSuivant)) {
           const idx = courant.findIndex(
-            (c, i) =>
-              !utilises.has(i) &&
-              ((estConnue(c.home_team) && c.home_team.team_id === equipe.team_id) ||
-                (estConnue(c.away_team) && c.away_team.team_id === equipe.team_id))
+            (t, i) => !utilises.has(i) && equipesTie(t).some((e) => e.team_id === eq.team_id)
           );
           if (idx >= 0) {
             ordonne.push(courant[idx]);
@@ -450,8 +571,8 @@ function CompetitionDetails() {
           }
         }
       }
-      courant.forEach((c, i) => {
-        if (!utilises.has(i)) ordonne.push(c);
+      courant.forEach((t, i) => {
+        if (!utilises.has(i)) ordonne.push(t);
       });
       rounds[k - 1] = ordonne;
     }
@@ -590,7 +711,9 @@ function CompetitionDetails() {
               <div className="space-y-10">
                 <section>
                   <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-4">Tableau final</h2>
-                  <div className="bg-white p-8 rounded-2xl ring-1 ring-slate-200 shadow-sm overflow-x-auto">
+
+                  {/* Ordinateur : arbre connecté avec connecteurs */}
+                  <div className="hidden lg:block bg-white p-8 rounded-2xl ring-1 ring-slate-200 shadow-sm overflow-x-auto">
                     <div className="bracket min-w-max">
                       {phasesTournoi.map((phaseName, indexPhase) => (
                         <div
@@ -601,15 +724,31 @@ function CompetitionDetails() {
                             {phaseName}
                           </h3>
                           <div className="bracket-items">
-                            {roundsTournoi[indexPhase].map((m) => (
-                              <div key={m.match_id} className="bracket-item">
-                                <CarteMatch m={m} />
+                            {roundsTies[indexPhase].map((tie) => (
+                              <div key={tie.id} className="bracket-item">
+                                <TieCard tie={tie} />
                               </div>
                             ))}
                           </div>
                         </div>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Téléphone : tours empilés verticalement (plus lisible) */}
+                  <div className="lg:hidden space-y-8">
+                    {phasesTournoi.map((phaseName, indexPhase) => (
+                      <div key={phaseName}>
+                        <h3 className="text-center text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-4 border-b-2 border-slate-100 pb-2">
+                          {phaseName}
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {roundsTies[indexPhase].map((tie) => (
+                            <TieCard key={tie.id} tie={tie} />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </section>
 
