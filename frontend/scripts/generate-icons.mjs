@@ -7,46 +7,36 @@ import path from 'node:path';
 
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
-const C = 256; // centre du viewBox 512x512
-const SLATE = '#0f172a';
-
-const rad = (deg) => (deg * Math.PI) / 180;
-const point = (angleDeg, r) => [C + r * Math.cos(rad(angleDeg)), C + r * Math.sin(rad(angleDeg))];
-
-// Pentagone (sommet vers le haut puis tourné de rotDeg)
-function pentagon(cx, cy, R, rotDeg = 0) {
-  const pts = [];
-  for (let i = 0; i < 5; i++) {
-    const a = rad(-90 + rotDeg + i * 72);
-    pts.push([cx + R * Math.cos(a), cy + R * Math.sin(a)]);
-  }
-  return 'M' + pts.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' L') + ' Z';
-}
-
-// Construction du ballon (pentagone central + 5 pentagones de bord + coutures)
-const RBALL = 176;
-const pieces = [];
-pieces.push(`<path d="${pentagon(C, C, 46)}" fill="${SLATE}"/>`); // pentagone central
-for (let i = 0; i < 5; i++) {
-  const theta = -90 + i * 72;
-  const [ex, ey] = point(theta, 134); // centre du pentagone de bord
-  const [sx, sy] = point(theta, 46); // sommet du pentagone central
-  pieces.push(`<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${SLATE}" stroke-width="14" stroke-linecap="round"/>`);
-  pieces.push(`<path d="${pentagon(ex, ey, 42, theta + 90)}" fill="${SLATE}"/>`);
-}
-
+// Logo généraliste « compétition sportive » : un trophée (tous sports
+// confondus), en blanc sur le fond émeraude de la charte.
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#10b981"/>
       <stop offset="1" stop-color="#047857"/>
     </linearGradient>
-    <clipPath id="ball"><circle cx="${C}" cy="${C}" r="${RBALL}"/></clipPath>
   </defs>
-  <rect width="512" height="512" rx="0" fill="url(#bg)"/>
-  <circle cx="${C}" cy="${C}" r="${RBALL + 6}" fill="#065f46"/>
-  <circle cx="${C}" cy="${C}" r="${RBALL}" fill="#ffffff"/>
-  <g clip-path="url(#ball)">${pieces.join('')}</g>
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <g fill="#ffffff">
+    <!-- Anses -->
+    <path d="M188 152 C150 150 138 197 182 222" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round"/>
+    <path d="M324 152 C374 150 374 197 330 222" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round"/>
+
+    <!-- Coupe -->
+    <path d="M176 140 L336 140 C336 208 312 272 256 286 C200 272 176 208 176 140 Z"/>
+
+    <!-- Pied -->
+    <rect x="247" y="282" width="18" height="36"/>
+    <rect x="222" y="314" width="68" height="16" rx="6"/>
+
+    <!-- Socle -->
+    <rect x="214" y="338" width="84" height="14" rx="5"/>
+    <rect x="192" y="354" width="128" height="22" rx="8"/>
+  </g>
+
+  <!-- Étoile centrale (accent émeraude) -->
+  <path fill="#10b981" d="M256 168 l11.6 23.5 25.9 3.8 -18.7 18.3 4.4 25.8 -23.2 -12.2 -23.2 12.2 4.4 -25.8 -18.7 -18.3 25.9 -3.8 Z"/>
 </svg>`;
 
 const buffer = Buffer.from(svg);

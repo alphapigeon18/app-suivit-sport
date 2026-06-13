@@ -66,7 +66,7 @@ function InstallPrompt() {
     <div className="fixed inset-x-0 bottom-0 z-50 p-4 pointer-events-none">
       <div className="pointer-events-auto max-w-md mx-auto bg-slate-900 text-white rounded-2xl shadow-2xl ring-1 ring-white/10 p-4 flex items-start gap-4">
         <span className="w-11 h-11 shrink-0 rounded-xl bg-emerald-500 flex items-center justify-center text-2xl shadow-lg shadow-emerald-500/30">
-          ⚽
+          🏆
         </span>
 
         <div className="flex-1 min-w-0">

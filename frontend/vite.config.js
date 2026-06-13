@@ -13,9 +13,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon-180x180.png'],
       manifest: {
-        name: 'SuiviSport — Compétitions de football',
+        name: 'SuiviSport — Compétitions sportives',
         short_name: 'SuiviSport',
-        description: 'Calendriers, scores et classements des grandes compétitions de football, en temps réel.',
+        description: 'Calendriers, scores et classements des grandes compétitions sportives, en temps réel.',
         lang: 'fr',
         theme_color: '#0f172a',
         background_color: '#0f172a',

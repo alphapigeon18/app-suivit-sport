@@ -32,14 +32,14 @@ function Home() {
         <div className="max-w-6xl mx-auto px-6 py-10 sm:py-14">
           <div className="flex items-center gap-4 mb-3">
             <span className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center text-2xl shadow-lg shadow-emerald-500/30">
-              ⚽
+              🏆
             </span>
             <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
               SUIVI<span className="text-emerald-400">SPORT</span>
             </h1>
           </div>
           <p className="text-slate-400 text-lg max-w-xl">
-            Calendriers, scores et classements des grandes compétitions de football,
+            Calendriers, scores et classements des grandes compétitions sportives,
             mis à jour en continu.
           </p>
         </div>
