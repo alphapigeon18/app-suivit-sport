@@ -210,8 +210,9 @@ app.post('/notifications/unsubscribe', async (req, res) => {
     }
 });
 
-// Envoi d'une notification de test à tous les abonnés (protégé par token)
-app.post('/notifications/test', async (req, res) => {
+// Envoi d'une notification de test à tous les abonnés (protégé par token).
+// Accessible en GET (pratique depuis un navigateur) ou POST.
+async function envoyerNotificationTest(req, res) {
     const secret = process.env.CRON_SECRET;
     if (secret) {
         const token = req.query.token || req.get('x-cron-token');
@@ -226,7 +227,9 @@ app.post('/notifications/test', async (req, res) => {
         badge: `${base}/pwa-192x192.png`,
     });
     res.json(resultat);
-});
+}
+app.get('/notifications/test', envoyerNotificationTest);
+app.post('/notifications/test', envoyerNotificationTest);
 
 // ============================================================================
 // 🚀 DÉMARRAGE DU SERVEUR
