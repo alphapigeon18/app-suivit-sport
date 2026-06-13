@@ -89,9 +89,17 @@ function PreferencesModal({ endpoint, onClose, onDisable }) {
           </div>
         ) : (
           <div className="overflow-y-auto px-5 py-4 space-y-6">
-            <p className="text-xs text-slate-400 -mt-1">
-              Tu seras prévenu à la fin des matchs des compétitions et des équipes que tu suis.
-            </p>
+            <div
+              className="text-xs text-slate-400 leading-relaxed -mt-1 rounded-lg px-3 py-2.5"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              Tu es alerté à la fin d'un match si <span className="text-slate-200 font-semibold">sa compétition</span> est
+              activée <span className="text-amber-400 font-semibold">ou</span> si l'une des deux équipes fait partie de tes{' '}
+              <span className="text-slate-200 font-semibold">équipes suivies</span>.
+              <span className="block mt-1.5 text-slate-500">
+                Pour ne suivre qu'une équipe précise, décoche les compétitions et ajoute-la ci-dessous.
+              </span>
+            </div>
 
             <section>
               <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-amber-400/70 mb-3">Compétitions</h3>
