@@ -64,8 +64,8 @@ function InstallPrompt() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 p-4 pointer-events-none">
-      <div className="pointer-events-auto max-w-md mx-auto bg-slate-900 text-white rounded-2xl shadow-2xl ring-1 ring-white/10 p-4 flex items-start gap-4">
-        <span className="w-11 h-11 shrink-0 rounded-xl bg-emerald-500 flex items-center justify-center text-2xl shadow-lg shadow-emerald-500/30">
+      <div className="glass-deep pointer-events-auto max-w-md mx-auto text-white rounded-2xl shadow-2xl p-4 flex items-start gap-4">
+        <span className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center text-2xl" style={{ background: 'linear-gradient(135deg,#fbbf24,#f59e0b 60%,#ea580c)', boxShadow: '0 8px 24px rgba(245,158,11,0.4)' }}>
           🏆
         </span>
 
@@ -85,10 +85,7 @@ function InstallPrompt() {
               <p className="text-slate-300 text-xs mt-1">
                 Accès rapide depuis ton écran d'accueil, en plein écran.
               </p>
-              <button
-                onClick={installer}
-                className="mt-2.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-bold rounded-lg transition-colors"
-              >
+              <button onClick={installer} className="btn-accent mt-2.5 px-4 py-2 text-sm font-bold rounded-lg">
                 Installer
               </button>
             </>

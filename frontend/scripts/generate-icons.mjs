@@ -19,17 +19,18 @@ const trophee = (fill) => `
     <rect x="192" y="354" width="128" height="22" rx="8"/>
   </g>`;
 
-// Icône de l'app : trophée blanc + étoile émeraude sur fond émeraude
+// Icône de l'app : trophée blanc + étoile ambre sur fond dégradé ambre→orange
 const iconeApp = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#10b981"/>
-      <stop offset="1" stop-color="#047857"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbbf24"/>
+      <stop offset="0.6" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#ea580c"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" fill="url(#bg)"/>
   ${trophee('#ffffff')}
-  <path fill="#10b981" d="M256 168 l11.6 23.5 25.9 3.8 -18.7 18.3 4.4 25.8 -23.2 -12.2 -23.2 12.2 4.4 -25.8 -18.7 -18.3 25.9 -3.8 Z"/>
+  <path fill="#f59e0b" d="M256 168 l11.6 23.5 25.9 3.8 -18.7 18.3 4.4 25.8 -23.2 -12.2 -23.2 12.2 4.4 -25.8 -18.7 -18.3 25.9 -3.8 Z"/>
 </svg>`;
 
 // Badge de notification (petite icône barre d'état Android) : silhouette

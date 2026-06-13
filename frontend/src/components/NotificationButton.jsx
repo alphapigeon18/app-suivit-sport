@@ -114,7 +114,7 @@ function NotificationButton() {
       {etat === 'active' ? (
         <button
           onClick={() => setModale(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40 hover:bg-emerald-500/25 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/40 hover:bg-amber-500/25 transition-colors"
         >
           🔔 Gérer mes alertes
         </button>
@@ -122,7 +122,7 @@ function NotificationButton() {
         <button
           onClick={activer}
           disabled={etat === 'chargement'}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-emerald-500 text-white hover:bg-emerald-400 transition-colors disabled:opacity-60"
+          className="btn-accent inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-60"
         >
           {etat === 'chargement' ? (
             <>

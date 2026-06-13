@@ -1,85 +1,146 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: dark;
+}
+
 body {
-  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+  font-family: 'Barlow', system-ui, -apple-system, sans-serif;
+  color: #e8eaf0;
+  background-color: #05060c;
+}
+
+/* Typo athlétique condensée pour les titres */
+h1, h2, h3, .font-display {
+  font-family: 'Barlow Condensed', 'Barlow', system-ui, sans-serif;
+  letter-spacing: 0.01em;
 }
 
 /* ============================================================
-   ARBRE DE TOURNOI
-   Chaque paire de matchs est reliée par un "coude" au match du
-   tour suivant : impair → coude vers le bas, pair → coude vers
-   le haut, et le match suivant reçoit une ligne entrante.
+   FOND CINÉMATIQUE : dégradé sombre + halos colorés animés
    ============================================================ */
-.bracket {
-  display: flex;
-  align-items: stretch;
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(60% 55% at 12% -5%, rgba(245, 158, 11, 0.18), transparent 60%),
+    radial-gradient(55% 50% at 105% 8%, rgba(99, 102, 241, 0.20), transparent 60%),
+    radial-gradient(45% 45% at 50% 110%, rgba(217, 70, 239, 0.10), transparent 60%),
+    linear-gradient(180deg, #0a0e1c 0%, #07080f 55%, #05060c 100%);
 }
 
-.bracket-round {
-  display: flex;
-  flex-direction: column;
+/* ============================================================
+   SURFACES VERRE (glassmorphism)
+   ============================================================ */
+.surface {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 16px;
 }
 
-.bracket-round + .bracket-round {
-  margin-left: 48px;
+.glass {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 18px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.28);
 }
 
-.bracket-items {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
+.glass-deep {
+  background: rgba(10, 13, 26, 0.78);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.bracket-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: 1;
-  padding: 10px 0;
+/* Survol : élévation + bord ambré + lueur */
+.hoverable {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hoverable:hover {
+  transform: translateY(-4px);
+  border-color: rgba(245, 158, 11, 0.55);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(245, 158, 11, 0.18),
+    0 0 50px -12px rgba(245, 158, 11, 0.4);
 }
 
-.bracket-item > * {
-  width: 100%;
+/* ============================================================
+   ACCENTS : boutons dégradés + texte dégradé
+   ============================================================ */
+.btn-accent {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 55%, #ea580c 100%);
+  color: #1a1206;
+  border: none;
+  box-shadow: 0 6px 22px rgba(245, 158, 11, 0.35);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s, filter 0.25s;
+}
+.btn-accent:hover {
+  transform: translateY(-1px) scale(1.02);
+  filter: brightness(1.07);
+  box-shadow: 0 12px 30px rgba(245, 158, 11, 0.5);
+}
+.btn-accent:active {
+  transform: scale(0.97);
 }
 
-/* Coudes sortants (sauf dernier tour) */
+.text-gradient {
+  background: linear-gradient(135deg, #fde68a, #f59e0b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hoverable, .btn-accent { transition: none; }
+  .hoverable:hover { transform: none; }
+}
+
+/* ============================================================
+   ARBRE DE TOURNOI (connecteurs adaptés au fond sombre)
+   ============================================================ */
+.bracket { display: flex; align-items: stretch; }
+.bracket-round { display: flex; flex-direction: column; }
+.bracket-round + .bracket-round { margin-left: 48px; }
+.bracket-items { display: flex; flex-direction: column; flex: 1; }
+.bracket-item { position: relative; display: flex; align-items: center; flex: 1; padding: 10px 0; }
+.bracket-item > * { width: 100%; }
+
 .bracket-round:not(.bracket-last) .bracket-item::after {
   content: '';
   position: absolute;
   right: -24px;
   width: 24px;
 }
-
 .bracket-round:not(.bracket-last) .bracket-item:nth-child(odd)::after {
   top: 50%;
   height: 50%;
-  border-top: 2px solid #cbd5e1;
-  border-right: 2px solid #cbd5e1;
+  border-top: 2px solid rgba(255, 255, 255, 0.18);
+  border-right: 2px solid rgba(255, 255, 255, 0.18);
   border-top-right-radius: 8px;
 }
-
 .bracket-round:not(.bracket-last) .bracket-item:nth-child(even)::after {
   bottom: 50%;
   height: 50%;
-  border-bottom: 2px solid #cbd5e1;
-  border-right: 2px solid #cbd5e1;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.18);
+  border-right: 2px solid rgba(255, 255, 255, 0.18);
   border-bottom-right-radius: 8px;
 }
-
-/* Colonne à match unique : simple ligne droite */
 .bracket-round:not(.bracket-last) .bracket-item:only-child::after {
   top: calc(50% - 1px);
   height: 2px;
   border: none;
-  background: #cbd5e1;
+  background: rgba(255, 255, 255, 0.18);
   border-radius: 0;
 }
-
-/* Ligne entrante (tous les tours sauf le premier) */
 .bracket-round:not(:first-child) .bracket-item:not(.bracket-isole)::before {
   content: '';
   position: absolute;
@@ -87,5 +148,5 @@ body {
   top: calc(50% - 1px);
   width: 24px;
   height: 2px;
-  background: #cbd5e1;
+  background: rgba(255, 255, 255, 0.18);
 }

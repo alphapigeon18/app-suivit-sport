@@ -17,8 +17,8 @@ export default defineConfig({
         short_name: 'SuiviSport',
         description: 'Calendriers, scores et classements des grandes compétitions sportives, en temps réel.',
         lang: 'fr',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        theme_color: '#0a0e1c',
+        background_color: '#06070c',
         display: 'standalone',
         orientation: 'portrait',
         icons: [

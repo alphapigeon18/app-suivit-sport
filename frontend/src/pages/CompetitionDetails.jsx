@@ -27,7 +27,6 @@ const traduireStatut = (s) => traductionsStatut[s] || s;
 
 const estPhaseFinale = (phaseTrad) => ordrePhases.includes(phaseTrad);
 
-// Tri des journées par numéro
 const comparerJournees = (a, b) => {
   const na = Number(/(\d+)/.exec(a)?.[1] ?? 1e9);
   const nb = Number(/(\d+)/.exec(b)?.[1] ?? 1e9);
@@ -37,7 +36,7 @@ const comparerJournees = (a, b) => {
 const parDate = (a, b) => new Date(a.start_time) - new Date(b.start_time);
 
 // ============================================================================
-// 🛡️ LOGO D'ÉQUIPE (avec remplacement propre si logo absent ou cassé)
+// 🛡️ LOGO D'ÉQUIPE
 // ============================================================================
 function TeamLogo({ equipe, taille = 'w-6 h-6' }) {
   const [enErreur, setEnErreur] = useState(false);
@@ -46,21 +45,14 @@ function TeamLogo({ equipe, taille = 'w-6 h-6' }) {
   if (inconnue) {
     return (
       <span
-        className={`${taille} shrink-0 rounded-full border-2 border-dashed border-slate-300 bg-slate-50
-                    flex items-center justify-center text-slate-300 text-[10px] font-black select-none`}
+        className={`${taille} shrink-0 rounded-full border-2 border-dashed border-white/20 bg-white/5
+                    flex items-center justify-center text-slate-500 text-[10px] font-black select-none`}
       >
         ?
       </span>
     );
   }
-  return (
-    <img
-      src={equipe.logo_url}
-      alt=""
-      className={`${taille} shrink-0 object-contain`}
-      onError={() => setEnErreur(true)}
-    />
-  );
+  return <img src={equipe.logo_url} alt="" className={`${taille} shrink-0 object-contain`} onError={() => setEnErreur(true)} />;
 }
 
 // ============================================================================
@@ -69,19 +61,20 @@ function TeamLogo({ equipe, taille = 'w-6 h-6' }) {
 function StatutChip({ statut }) {
   if (statut === 'IN_PLAY') {
     return (
-      <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 text-red-600 text-[11px] font-bold">
-        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+      <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold text-red-300" style={{ background: 'rgba(239,68,68,0.16)' }}>
+        <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse"></span>
         En direct
       </span>
     );
   }
   const styles = {
-    FINISHED: 'bg-slate-100 text-slate-500',
-    SCHEDULED: 'bg-blue-50 text-blue-600',
-    POSTPONED: 'bg-amber-50 text-amber-600',
+    FINISHED: 'bg-white/10 text-slate-400',
+    SCHEDULED: 'bg-white/5 text-slate-300',
+    POSTPONED: 'text-amber-300',
   };
+  const inline = statut === 'POSTPONED' ? { background: 'rgba(245,158,11,0.16)' } : undefined;
   return (
-    <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${styles[statut] || styles.SCHEDULED}`}>
+    <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${styles[statut] || styles.SCHEDULED}`} style={inline}>
       {traduireStatut(statut)}
     </span>
   );
@@ -102,12 +95,12 @@ function LigneEquipe({ equipe, score, gagnant, statut }) {
         <span
           className={`truncate text-sm ${
             inconnue
-              ? 'italic text-slate-400 font-medium'
+              ? 'italic text-slate-500 font-medium'
               : gagnant
-                ? 'font-extrabold text-slate-900'
+                ? 'font-extrabold text-white'
                 : fini
-                  ? 'font-medium text-slate-400'
-                  : 'font-semibold text-slate-700'
+                  ? 'font-medium text-slate-500'
+                  : 'font-semibold text-slate-200'
           }`}
         >
           {inconnue ? 'À déterminer' : equipe.name}
@@ -116,12 +109,12 @@ function LigneEquipe({ equipe, score, gagnant, statut }) {
       <span
         className={`text-base tabular-nums ${
           enCours
-            ? 'font-extrabold text-red-600'
+            ? 'font-extrabold text-amber-400'
             : gagnant
-              ? 'font-extrabold text-slate-900'
+              ? 'font-extrabold text-white'
               : fini
-                ? 'font-bold text-slate-400'
-                : 'font-bold text-slate-300'
+                ? 'font-bold text-slate-500'
+                : 'font-bold text-slate-600'
         }`}
       >
         {score ?? '–'}
@@ -138,11 +131,11 @@ function CarteMatch({ m }) {
   const date = new Date(m.start_time);
 
   return (
-    <div className="bg-white rounded-xl ring-1 ring-slate-200 shadow-sm hover:shadow-md hover:ring-slate-300 transition-all p-4 min-w-[250px]">
-      <div className="flex justify-between items-center gap-2 mb-2.5 pb-2 border-b border-slate-100">
-        <span className="text-xs font-semibold text-slate-400">
+    <div className="surface p-4 min-w-[250px]">
+      <div className="flex justify-between items-center gap-2 mb-2.5 pb-2 border-b border-white/10">
+        <span className="text-xs font-semibold text-slate-500">
           {date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
-          <span className="mx-1 text-slate-200">•</span>
+          <span className="mx-1 text-slate-700">•</span>
           {date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
         </span>
         <StatutChip statut={m.status} />
@@ -150,7 +143,7 @@ function CarteMatch({ m }) {
       <LigneEquipe equipe={m.home_team} score={m.home_score} gagnant={homeGagnant} statut={m.status} />
       <LigneEquipe equipe={m.away_team} score={m.away_score} gagnant={awayGagnant} statut={m.status} />
       {tab && (
-        <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] font-bold text-amber-600">
+        <div className="mt-2 pt-2 border-t border-white/10 text-[11px] font-bold text-amber-400">
           Tirs au but : {m.home_penalty} – {m.away_penalty}
         </div>
       )}
@@ -159,12 +152,10 @@ function CarteMatch({ m }) {
 }
 
 // ============================================================================
-// 🔀 CONFRONTATIONS (1 manche, ou aller-retour comme en Champions League)
+// 🔀 CONFRONTATIONS (1 manche ou aller-retour)
 // ============================================================================
 const estEquipeConnue = (eq) => eq && eq.team_id && eq.name !== 'À déterminer';
 
-// Regroupe les matchs d'un tour : les deux manches d'une même affiche
-// (mêmes équipes) sont fusionnées en une seule confrontation.
 function construireTies(matchs) {
   const parCle = new Map();
   const ordre = [];
@@ -178,7 +169,7 @@ function construireTies(matchs) {
       }
       parCle.get(cle).push(m);
     } else {
-      ordre.push([m]); // équipe inconnue (tour pas encore tiré) → confrontation seule
+      ordre.push([m]);
     }
   });
   return ordre.map(finaliserTie);
@@ -220,7 +211,6 @@ function finaliserTie(legsBruts) {
     if (aggA > aggB) qualifie = 'A';
     else if (aggB > aggA) qualifie = 'B';
     else {
-      // Égalité au cumul → tirs au but de la dernière manche
       const d = legs[legs.length - 1];
       const aDom = d.home_team?.team_id === idA;
       const pA = aDom ? d.home_penalty : d.away_penalty;
@@ -229,22 +219,9 @@ function finaliserTie(legsBruts) {
     }
   }
 
-  return {
-    id: ref.match_id,
-    teamA,
-    teamB,
-    scoreA: joue ? aggA : null,
-    scoreB: joue ? aggB : null,
-    aScores,
-    bScores,
-    legs,
-    deuxManches: legs.length > 1,
-    statut,
-    qualifie,
-  };
+  return { id: ref.match_id, teamA, teamB, scoreA: joue ? aggA : null, scoreB: joue ? aggB : null, aScores, bScores, legs, deuxManches: legs.length > 1, statut, qualifie };
 }
 
-// Détail des manches d'une confrontation aller-retour
 function detailManches(tie) {
   const manche = (i, label) => {
     const a = tie.aScores[i];
@@ -262,28 +239,24 @@ function detailManches(tie) {
   return texte;
 }
 
-// Carte d'une confrontation : 1 manche → carte de match classique ;
-// aller-retour → cumul des deux manches + qualifié en gras.
 function TieCard({ tie }) {
   if (!tie.deuxManches) return <CarteMatch m={tie.legs[0]} />;
   const fini = tie.statut === 'FINISHED';
   return (
-    <div className="bg-white rounded-xl ring-1 ring-slate-200 shadow-sm hover:shadow-md hover:ring-slate-300 transition-all p-4 min-w-[240px]">
-      <div className="flex justify-between items-center gap-2 mb-2.5 pb-2 border-b border-slate-100">
-        <span className="text-xs font-semibold text-slate-400">Aller-retour</span>
+    <div className="surface p-4 min-w-[240px]">
+      <div className="flex justify-between items-center gap-2 mb-2.5 pb-2 border-b border-white/10">
+        <span className="text-xs font-semibold text-slate-500">Aller-retour</span>
         <StatutChip statut={tie.statut} />
       </div>
       <LigneEquipe equipe={tie.teamA} score={tie.scoreA} gagnant={fini && tie.qualifie === 'A'} statut={tie.statut} />
       <LigneEquipe equipe={tie.teamB} score={tie.scoreB} gagnant={fini && tie.qualifie === 'B'} statut={tie.statut} />
-      <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400 font-medium">
-        {detailManches(tie)}
-      </div>
+      <div className="mt-2 pt-2 border-t border-white/10 text-[11px] text-slate-500 font-medium">{detailManches(tie)}</div>
     </div>
   );
 }
 
 // ============================================================================
-// 🏆 TABLEAU DE CLASSEMENT (groupe compact ou ligue complète)
+// 🏆 CLASSEMENT
 // ============================================================================
 function genererClassement(matchsDuGroupe) {
   if (!matchsDuGroupe) return [];
@@ -291,9 +264,7 @@ function genererClassement(matchsDuGroupe) {
   matchsDuGroupe.forEach((m) => {
     if (!m.home_team || !m.away_team) return;
     for (const t of [m.home_team, m.away_team]) {
-      if (!stats[t.team_id]) {
-        stats[t.team_id] = { id: t.team_id, equipe: t, pts: 0, j: 0, v: 0, n: 0, d: 0, bp: 0, bc: 0 };
-      }
+      if (!stats[t.team_id]) stats[t.team_id] = { id: t.team_id, equipe: t, pts: 0, j: 0, v: 0, n: 0, d: 0, bp: 0, bc: 0 };
     }
     if (m.status === 'FINISHED' && m.home_score != null && m.away_score != null) {
       const dom = stats[m.home_team.team_id];
@@ -317,11 +288,11 @@ function genererClassement(matchsDuGroupe) {
 
 function Classement({ titre, lignes, compact = false, placesQualif = 0 }) {
   return (
-    <div className="bg-white rounded-2xl ring-1 ring-slate-200 shadow-sm overflow-hidden">
-      <div className="bg-slate-900 px-5 py-3.5 font-bold text-white text-sm">{titre}</div>
+    <div className="glass overflow-hidden">
+      <div className="px-5 py-3.5 font-bold text-white text-sm border-b border-white/10">{titre}</div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-left">
-          <thead className="text-[11px] text-slate-400 uppercase tracking-wide border-b border-slate-100">
+          <thead className="text-[11px] text-slate-500 uppercase tracking-wide border-b border-white/10">
             <tr>
               <th className="px-4 py-2.5 font-bold">Équipe</th>
               <th className="px-2 py-2.5 text-center font-bold">J</th>
@@ -333,35 +304,36 @@ function Classement({ titre, lignes, compact = false, placesQualif = 0 }) {
                 </>
               )}
               <th className="px-2 py-2.5 text-center font-bold">+/-</th>
-              <th className="px-4 py-2.5 text-center font-bold text-emerald-600">Pts</th>
+              <th className="px-4 py-2.5 text-center font-bold text-amber-400">PTS</th>
             </tr>
           </thead>
           <tbody>
             {lignes.map((rang, index) => (
-              <tr key={rang.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
+              <tr key={rang.id} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-2.5">
                     <span
                       className={`w-5 h-5 rounded-md text-[11px] font-extrabold flex items-center justify-center shrink-0 ${
-                        placesQualif > 0 && index < placesQualif ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'
+                        placesQualif > 0 && index < placesQualif ? 'text-amber-300' : 'bg-white/8 text-slate-500'
                       }`}
+                      style={placesQualif > 0 && index < placesQualif ? { background: 'rgba(245,158,11,0.18)' } : undefined}
                     >
                       {index + 1}
                     </span>
                     <TeamLogo equipe={rang.equipe} taille="w-5 h-5" />
-                    <span className="font-semibold text-slate-800 truncate max-w-[96px] sm:max-w-[160px]">{rang.equipe.name}</span>
+                    <span className="font-semibold text-slate-200 truncate max-w-[96px] sm:max-w-[160px]">{rang.equipe.name}</span>
                   </div>
                 </td>
-                <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums">{rang.j}</td>
+                <td className="px-2 py-2.5 text-center text-slate-500 tabular-nums">{rang.j}</td>
                 {!compact && (
                   <>
-                    <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums hidden sm:table-cell">{rang.v}</td>
-                    <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums hidden sm:table-cell">{rang.n}</td>
-                    <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums hidden sm:table-cell">{rang.d}</td>
+                    <td className="px-2 py-2.5 text-center text-slate-500 tabular-nums hidden sm:table-cell">{rang.v}</td>
+                    <td className="px-2 py-2.5 text-center text-slate-500 tabular-nums hidden sm:table-cell">{rang.n}</td>
+                    <td className="px-2 py-2.5 text-center text-slate-500 tabular-nums hidden sm:table-cell">{rang.d}</td>
                   </>
                 )}
-                <td className="px-2 py-2.5 text-center text-slate-400 tabular-nums">{rang.diff > 0 ? `+${rang.diff}` : rang.diff}</td>
-                <td className="px-4 py-2.5 text-center font-extrabold text-slate-900 tabular-nums">{rang.pts}</td>
+                <td className="px-2 py-2.5 text-center text-slate-500 tabular-nums">{rang.diff > 0 ? `+${rang.diff}` : rang.diff}</td>
+                <td className="px-4 py-2.5 text-center font-extrabold text-white tabular-nums">{rang.pts}</td>
               </tr>
             ))}
           </tbody>
@@ -371,16 +343,13 @@ function Classement({ titre, lignes, compact = false, placesQualif = 0 }) {
   );
 }
 
-// ============================================================================
-// 📅 COLONNES DE JOURNÉES (championnat / phase de ligue)
-// ============================================================================
 function ColonnesJournees({ journees, ordre }) {
   return (
-    <div className="bg-white p-6 rounded-2xl ring-1 ring-slate-200 shadow-sm overflow-x-auto">
+    <div className="glass p-6 overflow-x-auto">
       <div className="flex gap-8 min-w-max">
         {ordre.map((phaseName) => (
           <div key={phaseName} className="flex flex-col min-w-[260px]">
-            <h3 className="text-center text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-4 border-b-2 border-slate-100 pb-2">
+            <h3 className="text-center text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-4 border-b-2 border-white/10 pb-2">
               {phaseName}
             </h3>
             <div className="flex flex-col gap-4">
@@ -396,7 +365,7 @@ function ColonnesJournees({ journees, ordre }) {
 }
 
 // ============================================================================
-// 📄 PAGE DÉTAIL D'UNE COMPÉTITION
+// 📄 PAGE
 // ============================================================================
 function CompetitionDetails() {
   const { id } = useParams();
@@ -408,7 +377,7 @@ function CompetitionDetails() {
   const [matchs, setMatchs] = useState([]);
   const [chargement, setChargement] = useState(true);
 
-  const [vueActive, setVueActive] = useState('classement'); // 'classement' | 'finale'
+  const [vueActive, setVueActive] = useState('classement');
   const [groupeActif, setGroupeActif] = useState('');
 
   useEffect(() => {
@@ -427,9 +396,6 @@ function CompetitionDetails() {
       });
   }, [id]);
 
-  // ==========================================================================
-  // 🧠 RÉPARTITION DES MATCHS : groupes / journées / phase finale
-  // ==========================================================================
   const { groupes, journees, finale, listeGroupes } = useMemo(() => {
     const matchsDeLaSaison = saisonActive ? matchs.filter((m) => m.season_id === saisonActive) : matchs;
 
@@ -438,7 +404,6 @@ function CompetitionDetails() {
     const fin = {};
     const matchsGroupesBruts = [];
 
-    // 1. Tri par nature de phase
     matchsDeLaSaison.forEach((m) => {
       const phaseBrute = m.phase || '';
       const phaseTrad = traduirePhase(phaseBrute);
@@ -454,7 +419,6 @@ function CompetitionDetails() {
       }
     });
 
-    // 2. Reconstruction des groupes lettrés (graphe des rencontres)
     const matriceRencontres = {};
     matchsGroupesBruts.forEach((m) => {
       const h = m.home_team?.team_id;
@@ -492,55 +456,36 @@ function CompetitionDetails() {
 
     matchsGroupesBruts.forEach((m) => {
       const phaseStr = m.phase || '';
-      let vraiGroupe = phaseStr.includes(' - ')
-        ? phaseStr.split(' - ')[0].replace('Group', 'Groupe')
-        : equipeVersGroupe[m.home_team?.team_id];
+      let vraiGroupe = phaseStr.includes(' - ') ? phaseStr.split(' - ')[0].replace('Group', 'Groupe') : equipeVersGroupe[m.home_team?.team_id];
       if (!vraiGroupe) vraiGroupe = 'Phase de Groupes';
       if (!grp[vraiGroupe]) grp[vraiGroupe] = [];
       grp[vraiGroupe].push(m);
     });
 
-    // 3. Tris
     Object.keys(grp).forEach((g) => grp[g].sort(parDate));
     Object.keys(fin).forEach((p) => fin[p].sort(parDate));
     const journeesOrdonnees = Object.keys(jrn)
       .sort(comparerJournees)
       .reduce((obj, k) => ((obj[k] = jrn[k].sort(parDate)), obj), {});
 
-    return {
-      groupes: grp,
-      journees: journeesOrdonnees,
-      finale: fin,
-      listeGroupes: Object.keys(grp).sort(),
-    };
+    return { groupes: grp, journees: journeesOrdonnees, finale: fin, listeGroupes: Object.keys(grp).sort() };
   }, [matchs, saisonActive]);
 
-  // ==========================================================================
-  // Valeurs dérivées
-  // ==========================================================================
   const aGroupes = listeGroupes.length > 0;
   const ordreJournees = Object.keys(journees);
   const aJournees = ordreJournees.length > 0;
   const aClassement = aGroupes || aJournees;
 
   const phasesTournoi = useMemo(
-    () =>
-      Object.keys(finale)
-        .filter((p) => p !== 'Troisième place')
-        .sort((a, b) => ordrePhases.indexOf(a) - ordrePhases.indexOf(b)),
+    () => Object.keys(finale).filter((p) => p !== 'Troisième place').sort((a, b) => ordrePhases.indexOf(a) - ordrePhases.indexOf(b)),
     [finale]
   );
   const troisiemePlace = finale['Troisième place'];
   const aFinale = phasesTournoi.length > 0;
 
-  // Classement de la ligue (CL phase de ligue, championnats) = toutes les journées
-  const classementLigue = useMemo(
-    () => genererClassement(Object.values(journees).flat()),
-    [journees]
-  );
+  const classementLigue = useMemo(() => genererClassement(Object.values(journees).flat()), [journees]);
   const classementGroupe = genererClassement(groupes[groupeActif]);
 
-  // Onglet par défaut selon ce qui existe
   useEffect(() => {
     if (!chargement) setVueActive(aFinale && !aClassement ? 'finale' : 'classement');
   }, [chargement, saisonActive, aClassement, aFinale]);
@@ -549,8 +494,6 @@ function CompetitionDetails() {
     if (listeGroupes.length > 0) setGroupeActif(listeGroupes[0]);
   }, [listeGroupes, saisonActive]);
 
-  // Regroupe chaque tour en confrontations (aller-retour fusionnés) puis
-  // réordonne pour aligner chaque paire face à sa confrontation suivante.
   const roundsTies = useMemo(() => {
     const equipesTie = (t) => [t.teamA, t.teamB].filter(estEquipeConnue);
     const rounds = phasesTournoi.map((p) => construireTies(finale[p]));
@@ -559,12 +502,9 @@ function CompetitionDetails() {
       const courant = rounds[k - 1];
       const ordonne = [];
       const utilises = new Set();
-
       for (const tieSuivant of rounds[k]) {
         for (const eq of equipesTie(tieSuivant)) {
-          const idx = courant.findIndex(
-            (t, i) => !utilises.has(i) && equipesTie(t).some((e) => e.team_id === eq.team_id)
-          );
+          const idx = courant.findIndex((t, i) => !utilises.has(i) && equipesTie(t).some((e) => e.team_id === eq.team_id));
           if (idx >= 0) {
             ordonne.push(courant[idx]);
             utilises.add(idx);
@@ -580,64 +520,58 @@ function CompetitionDetails() {
   }, [finale, phasesTournoi]);
 
   const libelleClassement = aGroupes ? 'Phase de groupes' : 'Classement';
+  const selectGlass = { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' };
 
-  // ==========================================================================
-  // 🎨 RENDU
-  // ==========================================================================
   return (
-    <div className="min-h-screen bg-slate-100">
-      {/* ===== Bandeau d'en-tête ===== */}
-      <header className="bg-slate-900">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <button
-            onClick={() => navigate('/')}
-            className="mb-5 text-sm font-semibold text-slate-400 hover:text-white transition-colors flex items-center gap-2"
-          >
-            ← Toutes les compétitions
-          </button>
+    <div className="min-h-dvh">
+      {/* ===== Hero ===== */}
+      <header className="max-w-7xl mx-auto px-6 pt-8 pb-6">
+        <button
+          onClick={() => navigate('/')}
+          className="mb-5 text-sm font-semibold text-slate-400 hover:text-white transition-colors flex items-center gap-2"
+        >
+          ← Toutes les compétitions
+        </button>
 
-          {ligue && !chargement && (
-            <div className="flex flex-wrap items-center justify-between gap-5">
-              <div className="flex items-center gap-5">
-                <div className="w-16 h-16 bg-white rounded-2xl p-2 flex items-center justify-center shadow-lg">
-                  <img src={ligue.logo_url} alt={ligue.name} className="max-w-full max-h-full object-contain" />
-                </div>
-                <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">{ligue.name}</h1>
+        {ligue && !chargement && (
+          <div className="flex flex-wrap items-center justify-between gap-5">
+            <div className="flex items-center gap-5">
+              <div className="w-16 h-16 rounded-2xl p-2 flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                <img src={ligue.logo_url} alt={ligue.name} className="max-w-full max-h-full object-contain" />
               </div>
-
-              {saisons.length > 0 && (
-                <select
-                  value={saisonActive}
-                  onChange={(e) => setSaisonActive(e.target.value)}
-                  className="bg-slate-800 border border-slate-700 text-white text-sm font-bold rounded-xl
-                             px-4 py-2.5 cursor-pointer focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                >
-                  {saisons.map((s) => (
-                    <option key={s.season_id} value={s.season_id}>
-                      Édition {s.year_label}
-                    </option>
-                  ))}
-                </select>
-              )}
+              <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{ligue.name}</h1>
             </div>
-          )}
-        </div>
+
+            {saisons.length > 0 && (
+              <select
+                value={saisonActive}
+                onChange={(e) => setSaisonActive(e.target.value)}
+                className="text-white text-sm font-bold rounded-xl px-4 py-2.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500"
+                style={selectGlass}
+              >
+                {saisons.map((s) => (
+                  <option key={s.season_id} value={s.season_id} className="bg-slate-900">
+                    Édition {s.year_label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-6 pb-16">
         {chargement ? (
           <div className="flex justify-center py-24">
-            <div className="animate-spin h-10 w-10 border-b-2 border-emerald-500 rounded-full"></div>
+            <div className="animate-spin h-10 w-10 border-b-2 border-amber-400 rounded-full"></div>
           </div>
         ) : matchs.length === 0 ? (
-          <p className="text-slate-500 bg-white p-8 rounded-2xl ring-1 ring-slate-200 text-center">
-            Aucun match programmé pour l'instant.
-          </p>
+          <p className="glass text-slate-300 p-8 text-center">Aucun match programmé pour l'instant.</p>
         ) : (
           <div className="space-y-8">
-            {/* ===== Onglets (si classement ET phase finale existent) ===== */}
+            {/* Onglets */}
             {aClassement && aFinale && (
-              <div className="inline-flex bg-white rounded-full p-1 ring-1 ring-slate-200 shadow-sm">
+              <div className="glass-deep inline-flex rounded-full p-1">
                 {[
                   ['classement', libelleClassement],
                   ['finale', 'Phase finale'],
@@ -646,8 +580,9 @@ function CompetitionDetails() {
                     key={cle}
                     onClick={() => setVueActive(cle)}
                     className={`px-5 py-2 text-sm font-bold rounded-full transition-all ${
-                      vueActive === cle ? 'bg-slate-900 text-white shadow' : 'text-slate-500 hover:text-slate-800'
+                      vueActive === cle ? 'text-slate-900' : 'text-slate-400 hover:text-white'
                     }`}
+                    style={vueActive === cle ? { background: 'linear-gradient(135deg,#fbbf24,#f59e0b)' } : undefined}
                   >
                     {label}
                   </button>
@@ -655,35 +590,30 @@ function CompetitionDetails() {
               </div>
             )}
 
-            {/* ===== Vue CLASSEMENT ===== */}
-            {vueActive === 'classement' && aClassement && (
-              aGroupes ? (
-                /* --- Groupes lettrés (Coupe du Monde, Euro) --- */
+            {/* Vue CLASSEMENT */}
+            {vueActive === 'classement' &&
+              aClassement &&
+              (aGroupes ? (
                 <div className="flex flex-col lg:flex-row gap-8">
                   <div className="w-full lg:w-1/3 flex flex-col gap-5">
                     {listeGroupes.length > 1 && (
                       <div className="flex flex-wrap gap-2">
-                        {listeGroupes.map((groupe) => (
-                          <button
-                            key={groupe}
-                            onClick={() => setGroupeActif(groupe)}
-                            className={`w-9 h-9 text-sm font-extrabold rounded-xl transition-all ${
-                              groupeActif === groupe
-                                ? 'bg-slate-900 text-white shadow-md'
-                                : 'bg-white ring-1 ring-slate-200 text-slate-500 hover:ring-slate-400'
-                            }`}
-                          >
-                            {groupe.replace('Groupe ', '')}
-                          </button>
-                        ))}
+                        {listeGroupes.map((groupe) => {
+                          const actif = groupeActif === groupe;
+                          return (
+                            <button
+                              key={groupe}
+                              onClick={() => setGroupeActif(groupe)}
+                              className={`w-9 h-9 text-sm font-extrabold rounded-xl transition-all ${actif ? 'text-slate-900' : 'surface text-slate-400 hover:text-white'}`}
+                              style={actif ? { background: 'linear-gradient(135deg,#fbbf24,#f59e0b)' } : undefined}
+                            >
+                              {groupe.replace('Groupe ', '')}
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
-                    <Classement
-                      titre={<>Classement <span className="text-emerald-400">{groupeActif}</span></>}
-                      lignes={classementGroupe}
-                      compact
-                      placesQualif={2}
-                    />
+                    <Classement titre={<>Classement <span className="text-amber-400">{groupeActif}</span></>} lignes={classementGroupe} compact placesQualif={2} />
                   </div>
 
                   <div className="w-full lg:w-2/3">
@@ -695,34 +625,26 @@ function CompetitionDetails() {
                   </div>
                 </div>
               ) : (
-                /* --- Ligue unique (Champions League, championnats) --- */
                 <div className="space-y-8">
                   <Classement titre="Classement" lignes={classementLigue} />
                   <section>
-                    <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-4">Journées</h2>
+                    <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-amber-400/70 mb-4">Journées</h2>
                     <ColonnesJournees journees={journees} ordre={ordreJournees} />
                   </section>
                 </div>
-              )
-            )}
+              ))}
 
-            {/* ===== Vue PHASE FINALE ===== */}
+            {/* Vue PHASE FINALE */}
             {vueActive === 'finale' && aFinale && (
               <div className="space-y-10">
                 <section>
-                  <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-4">Tableau final</h2>
+                  <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-amber-400/70 mb-4">Tableau final</h2>
 
-                  {/* Ordinateur : arbre connecté avec connecteurs */}
-                  <div className="hidden lg:block bg-white p-8 rounded-2xl ring-1 ring-slate-200 shadow-sm overflow-x-auto">
+                  <div className="hidden lg:block glass p-8 overflow-x-auto">
                     <div className="bracket min-w-max">
                       {phasesTournoi.map((phaseName, indexPhase) => (
-                        <div
-                          key={phaseName}
-                          className={`bracket-round w-[280px] ${indexPhase === phasesTournoi.length - 1 ? 'bracket-last' : ''}`}
-                        >
-                          <h3 className="text-center text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-4 border-b-2 border-slate-100 pb-2">
-                            {phaseName}
-                          </h3>
+                        <div key={phaseName} className={`bracket-round w-[280px] ${indexPhase === phasesTournoi.length - 1 ? 'bracket-last' : ''}`}>
+                          <h3 className="text-center text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-4 border-b-2 border-white/10 pb-2">{phaseName}</h3>
                           <div className="bracket-items">
                             {roundsTies[indexPhase].map((tie) => (
                               <div key={tie.id} className="bracket-item">
@@ -735,13 +657,10 @@ function CompetitionDetails() {
                     </div>
                   </div>
 
-                  {/* Téléphone : tours empilés verticalement (plus lisible) */}
                   <div className="lg:hidden space-y-8">
                     {phasesTournoi.map((phaseName, indexPhase) => (
                       <div key={phaseName}>
-                        <h3 className="text-center text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-4 border-b-2 border-slate-100 pb-2">
-                          {phaseName}
-                        </h3>
+                        <h3 className="text-center text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-4 border-b-2 border-white/10 pb-2">{phaseName}</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           {roundsTies[indexPhase].map((tie) => (
                             <TieCard key={tie.id} tie={tie} />
@@ -754,7 +673,7 @@ function CompetitionDetails() {
 
                 {troisiemePlace && (
                   <section>
-                    <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-4">Troisième place</h2>
+                    <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-amber-400/70 mb-4">Troisième place</h2>
                     <div className="max-w-sm">
                       {troisiemePlace.map((m) => (
                         <CarteMatch key={m.match_id} m={m} />
