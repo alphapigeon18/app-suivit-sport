@@ -21,3 +21,6 @@ Thumbs.db
 # Build React
 dist/
 dist-ssr/
+
+# Service worker généré en mode dev (vite-plugin-pwa)
+dev-dist/
