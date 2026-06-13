@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import prisma from './lib/prisma.js';
 import { majCalendrier } from './maj-calendrier.js';
-import { majQuotidienne } from './maj-quotidienne.js';
+import { majQuotidienne, finaliserMatchsBloques } from './maj-quotidienne.js';
 import { notifierMatchsTermines, envoyerATous } from './lib/notifications.js';
 
 // Initialisation
@@ -17,33 +17,54 @@ app.use(cors());
 // ============================================================================
 // ⚙️ CYCLE DE MISE À JOUR (déclenché par le ping cron-job.org toutes les 10 min)
 //
-// Le serveur décide lui-même quoi faire pour respecter les quotas gratuits
-// (API-Sports : 100 appels/jour) :
-//   - 1 fois par jour : synchronisation complète du calendrier (football-data)
-//   - sinon : rafraîchissement des scores UNIQUEMENT si des matchs sont en
-//     cours ou démarrent bientôt (1 appel API-Sports)
-//   - sinon : rien (le ping sert juste de keep-alive)
+// Le ping ne sert qu'à garder le serveur éveillé. Le cycle décide quoi faire
+// avec des contrôles en BASE (gratuits) ; il n'appelle l'API-Football QUE :
+//   - 1 fois par jour (après 4h) : synchro complète du calendrier + finalisation
+//   - pendant la FENÊTRE HORAIRE d'un match (du coup d'envoi à +2h40) : scores
+//   - quand un match est resté bloqué après son horaire : finalisation ciblée
+// Hors de ces cas, le ping ne fait qu'une lecture en base : zéro appel API.
 // ============================================================================
-let jobEnCours = false;
-let derniereSyncCalendrier = 0;
-const INTERVALLE_CALENDRIER = 23 * 60 * 60 * 1000; // ~1 fois par jour
+const FENETRE_FIN_MS = 160 * 60 * 1000;   // durée max d'un match (prolongations + t.a.b.)
+const HEURE_SYNC_UTC = 4;                  // synchro quotidienne après 4h (UTC)
 
-async function matchsEnCoursOuImminents() {
+let jobEnCours = false;
+let dernierJourSync = null;
+
+function syncQuotidienneDue() {
+    const now = new Date();
+    return now.getUTCHours() >= HEURE_SYNC_UTC && now.toISOString().slice(0, 10) !== dernierJourSync;
+}
+
+// Y a-t-il un match dans sa fenêtre horaire (coup d'envoi imminent ou en cours) ?
+// Basé sur start_time, PAS sur le statut → insensible aux matchs bloqués.
+async function fenetreMatchActive() {
     const maintenant = Date.now();
-    return prisma.match.count({
+    const n = await prisma.match.count({
         where: {
-            OR: [
-                { status: 'IN_PLAY' },
-                {
-                    status: 'SCHEDULED',
-                    start_time: {
-                        gte: new Date(maintenant - 3 * 60 * 60 * 1000), // démarré il y a < 3h (statut pas encore à jour)
-                        lte: new Date(maintenant + 30 * 60 * 1000),     // ou qui démarre dans < 30 min
-                    },
-                },
-            ],
+            status: { in: ['SCHEDULED', 'IN_PLAY'] },
+            start_time: {
+                gte: new Date(maintenant - FENETRE_FIN_MS), // a commencé il y a moins de 2h40
+                lte: new Date(maintenant + 5 * 60 * 1000),  // ou commence dans moins de 5 min
+            },
         },
     });
+    return n > 0;
+}
+
+// Un match a-t-il dépassé sa fenêtre sans être finalisé ?
+async function aDesMatchsBloques() {
+    const maintenant = Date.now();
+    const n = await prisma.match.count({
+        where: {
+            status: { in: ['SCHEDULED', 'IN_PLAY'] },
+            api_id: { not: null },
+            start_time: {
+                gte: new Date(maintenant - 3 * 24 * 60 * 60 * 1000),
+                lt: new Date(maintenant - FENETRE_FIN_MS),
+            },
+        },
+    });
+    return n > 0;
 }
 
 async function executerCycle() {
@@ -53,33 +74,37 @@ async function executerCycle() {
     }
     jobEnCours = true;
     try {
-        if (Date.now() - derniereSyncCalendrier > INTERVALLE_CALENDRIER) {
-            console.log(`\n🔄 [${new Date().toISOString()}] Cycle complet quotidien...`);
+        if (syncQuotidienneDue()) {
+            console.log(`\n🔄 [${new Date().toISOString()}] Synchro quotidienne...`);
+            dernierJourSync = new Date().toISOString().slice(0, 10);
             try {
                 await majCalendrier();
-                derniereSyncCalendrier = Date.now();
             } catch (erreur) {
-                console.error('❌ Erreur sur le calendrier (football-data) :', erreur.message);
+                console.error('❌ Erreur calendrier (football-data) :', erreur.message);
             }
+            try {
+                await finaliserMatchsBloques();
+            } catch (erreur) {
+                console.error('❌ Erreur finalisation :', erreur.message);
+            }
+            console.log('🏁 Synchro quotidienne terminée.');
+        } else if (await fenetreMatchActive()) {
+            console.log('⚽ Match dans sa fenêtre horaire : rafraîchissement des scores...');
             try {
                 await majQuotidienne();
             } catch (erreur) {
-                console.error('❌ Erreur sur la MAJ quotidienne (API-Sports) :', erreur.message);
+                console.error('❌ Erreur rafraîchissement live :', erreur.message);
             }
-            console.log('🏁 Cycle complet terminé.');
-        } else {
-            const actifs = await matchsEnCoursOuImminents();
-            if (actifs > 0) {
-                console.log(`⚽ ${actifs} match(s) en cours ou imminent(s) : rafraîchissement des scores...`);
-                try {
-                    await majQuotidienne();
-                } catch (erreur) {
-                    console.error('❌ Erreur sur le rafraîchissement live :', erreur.message);
-                }
+        } else if (await aDesMatchsBloques()) {
+            try {
+                await finaliserMatchsBloques();
+            } catch (erreur) {
+                console.error('❌ Erreur finalisation :', erreur.message);
             }
         }
+        // (sinon : rien — le ping n'a fait que des lectures en base, aucun appel API)
 
-        // Après toute mise à jour, on notifie les matchs qui viennent de se terminer
+        // On notifie les matchs qui viennent de passer à « terminé »
         try {
             await notifierMatchsTermines();
         } catch (erreur) {
