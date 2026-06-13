@@ -224,7 +224,7 @@ async function envoyerNotificationTest(req, res) {
         body: 'Notification de test — tout fonctionne !',
         url: base,
         icon: `${base}/pwa-192x192.png`,
-        badge: `${base}/pwa-192x192.png`,
+        badge: `${base}/badge-96x96.png`,
     });
     res.json(resultat);
 }

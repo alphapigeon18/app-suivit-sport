@@ -88,7 +88,7 @@ export async function notifierMatchsTermines() {
             tag: `match-${m.match_id}`,
             url: `${FRONTEND_URL}/competition/${competition.competition_id}`,
             icon: `${FRONTEND_URL}/pwa-192x192.png`,
-            badge: `${FRONTEND_URL}/pwa-192x192.png`,
+            badge: `${FRONTEND_URL}/badge-96x96.png`,
             sousTitre: competition.name,
         };
 
