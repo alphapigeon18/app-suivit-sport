@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '@/config';
+import PreferencesModal from './PreferencesModal';
 
 // Convertit la clé VAPID (base64 url) en Uint8Array attendu par pushManager
 function urlBase64ToUint8Array(base64String) {
@@ -17,6 +18,8 @@ const supporte = () =>
 function NotificationButton() {
   // 'verif' | 'non-supporte' | 'desactive' | 'active' | 'refuse' | 'chargement'
   const [etat, setEtat] = useState('verif');
+  const [endpoint, setEndpoint] = useState(null);
+  const [modale, setModale] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -30,7 +33,14 @@ function NotificationButton() {
     }
     navigator.serviceWorker.ready
       .then((reg) => reg.pushManager.getSubscription())
-      .then((sub) => setEtat(sub ? 'active' : 'desactive'))
+      .then((sub) => {
+        if (sub) {
+          setEndpoint(sub.endpoint);
+          setEtat('active');
+        } else {
+          setEtat('desactive');
+        }
+      })
       .catch(() => setEtat('desactive'));
   }, []);
 
@@ -61,7 +71,9 @@ function NotificationButton() {
       });
       if (!envoi.ok) throw new Error('enregistrement échoué');
 
+      setEndpoint(sub.endpoint);
       setEtat('active');
+      setModale(true); // on propose tout de suite de choisir ses préférences
     } catch (erreur) {
       console.error('Activation notifications :', erreur);
       setMessage("L'activation a échoué. Sur iPhone, l'app doit d'abord être installée sur l'écran d'accueil.");
@@ -70,6 +82,7 @@ function NotificationButton() {
   };
 
   const desactiver = async () => {
+    setModale(false);
     setEtat('chargement');
     try {
       const reg = await navigator.serviceWorker.ready;
@@ -82,6 +95,7 @@ function NotificationButton() {
         });
         await sub.unsubscribe();
       }
+      setEndpoint(null);
       setEtat('desactive');
     } catch (erreur) {
       console.error('Désactivation notifications :', erreur);
@@ -92,38 +106,40 @@ function NotificationButton() {
   if (etat === 'verif' || etat === 'non-supporte') return null;
 
   if (etat === 'refuse') {
-    return (
-      <p className="text-xs text-slate-400 mt-3">
-        🔕 Notifications bloquées dans les réglages du navigateur.
-      </p>
-    );
+    return <p className="text-xs text-slate-400 mt-3">🔕 Notifications bloquées dans les réglages du navigateur.</p>;
   }
-
-  const active = etat === 'active';
 
   return (
     <div className="mt-4">
-      <button
-        onClick={active ? desactiver : activer}
-        disabled={etat === 'chargement'}
-        className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-60 ${
-          active
-            ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40 hover:bg-emerald-500/25'
-            : 'bg-emerald-500 text-white hover:bg-emerald-400'
-        }`}
-      >
-        {etat === 'chargement' ? (
-          <>
-            <span className="w-4 h-4 border-2 border-current border-b-transparent rounded-full animate-spin"></span>
-            Patiente…
-          </>
-        ) : active ? (
-          <>🔔 Alertes de fin de match activées</>
-        ) : (
-          <>🔔 M'alerter à la fin des matchs</>
-        )}
-      </button>
+      {etat === 'active' ? (
+        <button
+          onClick={() => setModale(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40 hover:bg-emerald-500/25 transition-colors"
+        >
+          🔔 Gérer mes alertes
+        </button>
+      ) : (
+        <button
+          onClick={activer}
+          disabled={etat === 'chargement'}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-emerald-500 text-white hover:bg-emerald-400 transition-colors disabled:opacity-60"
+        >
+          {etat === 'chargement' ? (
+            <>
+              <span className="w-4 h-4 border-2 border-current border-b-transparent rounded-full animate-spin"></span>
+              Patiente…
+            </>
+          ) : (
+            <>🔔 M'alerter à la fin des matchs</>
+          )}
+        </button>
+      )}
+
       {message && <p className="text-xs text-amber-300/90 mt-2 max-w-sm">{message}</p>}
+
+      {modale && endpoint && (
+        <PreferencesModal endpoint={endpoint} onClose={() => setModale(false)} onDisable={desactiver} />
+      )}
     </div>
   );
 }

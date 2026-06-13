@@ -13,15 +13,14 @@ function configurerWebPush() {
     return true;
 }
 
-// Envoie une notification à tous les appareils abonnés.
+// Envoie une notification à une liste précise d'abonnements.
 // Supprime au passage les abonnements expirés (404/410).
-export async function envoyerATous(payload) {
+async function envoyerA(abonnements, payload) {
     if (!configurerWebPush()) {
         console.warn('⚠️ Clés VAPID absentes : notifications désactivées.');
         return { envoyees: 0, supprimees: 0 };
     }
 
-    const abonnements = await prisma.push_subscription.findMany();
     const corps = JSON.stringify(payload);
     let envoyees = 0;
     const endpointsMorts = [];
@@ -47,6 +46,12 @@ export async function envoyerATous(payload) {
     }
 
     return { envoyees, supprimees: endpointsMorts.length };
+}
+
+// Envoie à TOUS les abonnés (utilisé par la route de test)
+export async function envoyerATous(payload) {
+    const abonnements = await prisma.push_subscription.findMany();
+    return envoyerA(abonnements, payload);
 }
 
 // Détecte les matchs qui viennent de se terminer (status FINISHED, jamais
@@ -93,7 +98,18 @@ export async function notifierMatchsTermines() {
         };
 
         try {
-            const res = await envoyerATous(payload);
+            // On ne notifie que les appareils qui suivent cette compétition
+            // OU l'une des deux équipes du match.
+            const abonnes = await prisma.push_subscription.findMany({
+                where: {
+                    OR: [
+                        { competitions: { has: competition.competition_id } },
+                        { teams: { has: m.home_team_id } },
+                        { teams: { has: m.away_team_id } },
+                    ],
+                },
+            });
+            const res = await envoyerA(abonnes, payload);
             await prisma.match.update({ where: { match_id: m.match_id }, data: { notified_at: new Date() } });
             console.log(`   ✅ ${dom} ${score} ${ext} → ${res.envoyees} appareil(s)`);
         } catch (erreur) {

@@ -89,11 +89,13 @@ model user_follows {
 }
 
 model push_subscription {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  endpoint   String   @unique
-  p256dh     String
-  auth       String
-  created_at DateTime @default(now()) @db.Timestamptz(6)
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  endpoint     String   @unique
+  p256dh       String
+  auth         String
+  competitions String[] @default([]) // competition_id suivis → notifié pour tous leurs matchs
+  teams        String[] @default([]) // team_id suivis → notifié pour leurs matchs (toutes compétitions)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
 }
 
 enum match_status {

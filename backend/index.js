@@ -153,6 +153,21 @@ app.get('/competitions', async (req, res) => {
     }
 });
 
+// Liste des équipes (sélecteur de préférences de notification)
+app.get('/teams', async (req, res) => {
+    try {
+        const teams = await prisma.team.findMany({
+            where: { name: { not: 'À déterminer' } },
+            select: { team_id: true, name: true, logo_url: true },
+            orderBy: { name: 'asc' },
+        });
+        res.json(teams);
+    } catch (erreur) {
+        console.error('❌ /teams :', erreur.message);
+        res.status(500).json({ erreur: 'Erreur lors de la récupération.' });
+    }
+});
+
 // Détail d'une compétition : infos, saisons et tous les matchs (page détail)
 app.get('/competitions/:id/matchs', async (req, res) => {
     try {
@@ -204,22 +219,61 @@ app.get('/notifications/vapid-public-key', (req, res) => {
     res.json({ publicKey: cle });
 });
 
-// Enregistre l'abonnement d'un appareil
+// Enregistre l'abonnement d'un appareil. Par défaut, un nouvel appareil
+// suit toutes les compétitions (l'utilisateur affine ensuite ses préférences).
 app.post('/notifications/subscribe', async (req, res) => {
     try {
         const sub = req.body;
         if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
             return res.status(400).json({ erreur: 'Abonnement invalide.' });
         }
+        const comps = await prisma.competition.findMany({ select: { competition_id: true } });
         await prisma.push_subscription.upsert({
             where: { endpoint: sub.endpoint },
-            create: { endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth },
-            update: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+            create: {
+                endpoint: sub.endpoint,
+                p256dh: sub.keys.p256dh,
+                auth: sub.keys.auth,
+                competitions: comps.map((c) => c.competition_id),
+            },
+            update: { p256dh: sub.keys.p256dh, auth: sub.keys.auth }, // ne touche pas aux préférences
         });
         res.status(201).json({ ok: true });
     } catch (erreur) {
         console.error('❌ /notifications/subscribe :', erreur.message);
         res.status(500).json({ erreur: 'Erreur abonnement.' });
+    }
+});
+
+// Préférences d'un appareil (compétitions + équipes suivies)
+app.get('/notifications/preferences', async (req, res) => {
+    try {
+        const endpoint = req.query.endpoint;
+        if (!endpoint) return res.status(400).json({ erreur: 'endpoint manquant.' });
+        const ab = await prisma.push_subscription.findUnique({ where: { endpoint } });
+        if (!ab) return res.status(404).json({ erreur: 'Abonnement introuvable.' });
+        res.json({ competitions: ab.competitions, teams: ab.teams });
+    } catch (erreur) {
+        console.error('❌ GET /notifications/preferences :', erreur.message);
+        res.status(500).json({ erreur: 'Erreur préférences.' });
+    }
+});
+
+app.post('/notifications/preferences', async (req, res) => {
+    try {
+        const { endpoint, competitions, teams } = req.body;
+        if (!endpoint) return res.status(400).json({ erreur: 'endpoint manquant.' });
+        await prisma.push_subscription.update({
+            where: { endpoint },
+            data: {
+                competitions: Array.isArray(competitions) ? competitions : [],
+                teams: Array.isArray(teams) ? teams : [],
+            },
+        });
+        res.json({ ok: true });
+    } catch (erreur) {
+        console.error('❌ POST /notifications/preferences :', erreur.message);
+        res.status(500).json({ erreur: 'Erreur préférences.' });
     }
 });
 
