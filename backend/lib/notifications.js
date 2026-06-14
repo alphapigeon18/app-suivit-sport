@@ -3,6 +3,26 @@ import prisma from './prisma.js';
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'https://alphapigeon18.github.io/app-suivit-sport').replace(/\/$/, '');
 
+// Traduit le niveau du tournoi pour l'afficher dans la notification
+const phasesFinales = {
+    'Round of 64': '32es de finale',
+    'Round of 32': '16es de finale',
+    'Round of 16': 'Huitième de finale',
+    'Play-offs': 'Barrages',
+    'Quarter-finals': 'Quart de finale',
+    'Semi-finals': 'Demi-finale',
+    'Final': 'Finale',
+    '3rd Place Final': 'Match pour la 3e place',
+};
+export function traduirePhase(phase) {
+    if (!phase) return null;
+    const journee = /^(Regular Season|League Stage) - (\d+)$/.exec(phase);
+    if (journee) return `Journée ${journee[2]}`;
+    const groupe = /^Group ([A-L])/i.exec(phase);
+    if (groupe) return `Groupe ${groupe[1].toUpperCase()}`;
+    return phasesFinales[phase] || phase;
+}
+
 let configure = false;
 function configurerWebPush() {
     if (configure) return true;
@@ -87,14 +107,16 @@ export async function notifierMatchsTermines() {
                 ? ` (${m.home_penalty}-${m.away_penalty} t.a.b.)`
                 : '';
 
+        const phaseFr = traduirePhase(m.phase);
+        const contexte = phaseFr ? `${competition.name} · ${phaseFr}` : competition.name;
+
         const payload = {
-            title: '🏆 Match terminé',
+            title: `🏆 ${contexte}`,
             body: `${dom} ${score} ${ext}${tab}`,
             tag: `match-${m.match_id}`,
             url: `${FRONTEND_URL}/competition/${competition.competition_id}`,
             icon: `${FRONTEND_URL}/pwa-192x192.png`,
             badge: `${FRONTEND_URL}/badge-96x96.png`,
-            sousTitre: competition.name,
         };
 
         try {
