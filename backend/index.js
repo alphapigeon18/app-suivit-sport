@@ -5,6 +5,7 @@ import prisma from './lib/prisma.js';
 import { majCalendrier } from './maj-calendrier.js';
 import { majQuotidienne, finaliserMatchsBloques } from './maj-quotidienne.js';
 import { notifierMatchsTermines, envoyerATous } from './lib/notifications.js';
+import { construireICS } from './lib/calendar.js';
 
 // Initialisation
 const app = express();
@@ -252,7 +253,7 @@ app.get('/notifications/preferences', async (req, res) => {
         if (!endpoint) return res.status(400).json({ erreur: 'endpoint manquant.' });
         const ab = await prisma.push_subscription.findUnique({ where: { endpoint } });
         if (!ab) return res.status(404).json({ erreur: 'Abonnement introuvable.' });
-        res.json({ competitions: ab.competitions, teams: ab.teams });
+        res.json({ id: ab.id, competitions: ab.competitions, teams: ab.teams });
     } catch (erreur) {
         console.error('❌ GET /notifications/preferences :', erreur.message);
         res.status(500).json({ erreur: 'Erreur préférences.' });
@@ -309,6 +310,47 @@ async function envoyerNotificationTest(req, res) {
 }
 app.get('/notifications/test', envoyerNotificationTest);
 app.post('/notifications/test', envoyerNotificationTest);
+
+// ============================================================================
+// 📅 FLUX CALENDRIER (.ics) — matchs suivis d'un appareil
+// L'identifiant de l'abonnement sert de jeton (URL non devinable).
+// L'agenda de l'utilisateur s'y abonne et se rafraîchit tout seul.
+// ============================================================================
+app.get('/calendar/:token', async (req, res) => {
+    try {
+        const id = req.params.token.replace(/\.ics$/i, '');
+        const ab = await prisma.push_subscription.findUnique({ where: { id } });
+        if (!ab) return res.status(404).send('Calendrier introuvable.');
+
+        // Mêmes critères que les notifications : compétition suivie OU équipe suivie.
+        // On garde les matchs récents (résultats) et tous les matchs à venir.
+        const matchs = await prisma.match.findMany({
+            where: {
+                start_time: { gte: new Date(Date.now() - 36 * 60 * 60 * 1000) },
+                OR: [
+                    { season: { competition_id: { in: ab.competitions } } },
+                    { home_team_id: { in: ab.teams } },
+                    { away_team_id: { in: ab.teams } },
+                ],
+            },
+            include: {
+                team_match_home_team_idToteam: true,
+                team_match_away_team_idToteam: true,
+                season: { include: { competition: true } },
+            },
+            orderBy: { start_time: 'asc' },
+            take: 400,
+        });
+
+        const ics = construireICS(matchs, 'SuiviSport — Mes matchs');
+        res.set('Content-Type', 'text/calendar; charset=utf-8');
+        res.set('Content-Disposition', 'inline; filename="suivisport.ics"');
+        res.send(ics);
+    } catch (erreur) {
+        console.error('❌ /calendar :', erreur.message);
+        res.status(500).send('Erreur calendrier.');
+    }
+});
 
 // ============================================================================
 // 🚀 DÉMARRAGE DU SERVEUR

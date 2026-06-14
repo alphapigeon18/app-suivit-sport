@@ -20,6 +20,8 @@ function PreferencesModal({ endpoint, onClose, onDisable }) {
   const [recherche, setRecherche] = useState('');
   const [chargement, setChargement] = useState(true);
   const [enregistrement, setEnregistrement] = useState(false);
+  const [id, setId] = useState(null);
+  const [copie, setCopie] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -30,6 +32,7 @@ function PreferencesModal({ endpoint, onClose, onDisable }) {
       .then(([comps, tms, prefs]) => {
         setCompetitions(comps);
         setTeams(tms);
+        setId(prefs.id || null);
         setCompsSel(new Set(prefs.competitions || []));
         setTeamsSel(new Set(prefs.teams || []));
         setChargement(false);
@@ -69,6 +72,18 @@ function PreferencesModal({ endpoint, onClose, onDisable }) {
   };
 
   const aucuneAlerte = compsSel.size === 0 && teamsSel.size === 0;
+
+  const feedUrl = id ? `${API_BASE_URL}/calendar/${id}.ics` : '';
+  const webcalUrl = feedUrl.replace(/^https?:/, 'webcal:');
+  const copierLien = async () => {
+    try {
+      await navigator.clipboard.writeText(feedUrl);
+      setCopie(true);
+      setTimeout(() => setCopie(false), 2000);
+    } catch (e) {
+      console.error('Copie du lien :', e);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
@@ -166,6 +181,32 @@ function PreferencesModal({ endpoint, onClose, onDisable }) {
                 </div>
               )}
             </section>
+
+            {/* Calendrier */}
+            {id && (
+              <section>
+                <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-amber-400/70 mb-3">Calendrier</h3>
+                <p className="text-xs text-slate-400 mb-3 leading-relaxed">
+                  Ajoute tes matchs suivis à ton agenda. Il se met à jour tout seul quand de nouveaux matchs sont programmés.
+                </p>
+                <div className="flex flex-col gap-2">
+                  <a href={webcalUrl} className="btn-accent px-4 py-2 text-sm font-bold rounded-xl text-center">
+                    📅 S'abonner au calendrier
+                  </a>
+                  <button
+                    onClick={copierLien}
+                    className="px-4 py-2 text-sm font-semibold rounded-xl text-slate-200 hover:bg-white/5 transition-colors"
+                    style={{ border: '1px solid rgba(255,255,255,0.12)' }}
+                  >
+                    {copie ? 'Lien copié ✓' : 'Copier le lien (Google Agenda…)'}
+                  </button>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    iPhone : « S'abonner » ouvre directement Calendrier. Google Agenda : copie le lien, puis Autres agendas →
+                    À partir de l'URL. Reflète tes sélections enregistrées.
+                  </p>
+                </div>
+              </section>
+            )}
 
             {aucuneAlerte && (
               <p className="text-xs text-amber-300 rounded-lg px-3 py-2" style={{ background: 'rgba(245,158,11,0.12)' }}>
