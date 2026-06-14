@@ -344,7 +344,9 @@ app.get('/calendar/:token', async (req, res) => {
 
         const ics = construireICS(matchs, 'SuiviSport — Mes matchs');
         res.set('Content-Type', 'text/calendar; charset=utf-8');
-        res.set('Content-Disposition', 'inline; filename="suivisport.ics"');
+        // ?dl=1 → téléchargement du fichier (import ponctuel, utile sur Android)
+        const disposition = req.query.dl ? 'attachment' : 'inline';
+        res.set('Content-Disposition', `${disposition}; filename="suivisport.ics"`);
         res.send(ics);
     } catch (erreur) {
         console.error('❌ /calendar :', erreur.message);

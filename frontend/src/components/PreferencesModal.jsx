@@ -191,18 +191,27 @@ function PreferencesModal({ endpoint, onClose, onDisable }) {
                 </p>
                 <div className="flex flex-col gap-2">
                   <a href={webcalUrl} className="btn-accent px-4 py-2 text-sm font-bold rounded-xl text-center">
-                    📅 S'abonner au calendrier
+                    📅 S'abonner (mise à jour auto)
+                  </a>
+                  <a
+                    href={`${feedUrl}?dl=1`}
+                    className="px-4 py-2 text-sm font-semibold rounded-xl text-slate-200 hover:bg-white/5 transition-colors text-center"
+                    style={{ border: '1px solid rgba(255,255,255,0.12)' }}
+                  >
+                    Télécharger le fichier (.ics)
                   </a>
                   <button
                     onClick={copierLien}
                     className="px-4 py-2 text-sm font-semibold rounded-xl text-slate-200 hover:bg-white/5 transition-colors"
                     style={{ border: '1px solid rgba(255,255,255,0.12)' }}
                   >
-                    {copie ? 'Lien copié ✓' : 'Copier le lien (Google Agenda…)'}
+                    {copie ? 'Lien copié ✓' : 'Copier le lien'}
                   </button>
                   <p className="text-[11px] text-slate-500 leading-relaxed">
-                    iPhone : « S'abonner » ouvre directement Calendrier. Google Agenda : copie le lien, puis Autres agendas →
-                    À partir de l'URL. Reflète tes sélections enregistrées.
+                    <span className="text-slate-300 font-semibold">iPhone :</span> « S'abonner » (mise à jour automatique).{' '}
+                    <span className="text-slate-300 font-semibold">Android :</span> « Télécharger », puis ouvre le fichier pour
+                    l'ajouter à ton agenda. Pour la mise à jour auto sur Android, ajoute le lien copié dans Google Agenda sur
+                    ordinateur (Autres agendas → À partir de l'URL).
                   </p>
                 </div>
               </section>
