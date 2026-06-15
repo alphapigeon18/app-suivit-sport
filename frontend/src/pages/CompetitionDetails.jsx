@@ -123,12 +123,25 @@ function LigneEquipe({ equipe, score, gagnant, statut }) {
   );
 }
 
+function ButeurLigne({ b, align }) {
+  const marque = `${b.penalty ? ' (p)' : ''}${b.csc ? ' (csc)' : ''}`;
+  return (
+    <div className={`truncate ${align === 'right' ? 'text-right' : ''}`}>
+      {align === 'right' ? `${b.joueur} ${b.minute}′${marque}` : `${b.minute}′ ${b.joueur}${marque}`}
+    </div>
+  );
+}
+
 function CarteMatch({ m }) {
   const fini = m.status === 'FINISHED';
   const homeGagnant = fini && (m.home_winner === true || m.home_score > m.away_score);
   const awayGagnant = fini && (m.away_winner === true || m.away_score > m.home_score);
   const tab = typeof m.home_penalty === 'number' && typeof m.away_penalty === 'number';
   const date = new Date(m.start_time);
+
+  const buts = Array.isArray(m.events) ? m.events : [];
+  const butsHome = buts.filter((b) => b.cote === 'home');
+  const butsAway = buts.filter((b) => b.cote === 'away');
 
   return (
     <div className="surface p-4 min-w-[250px]">
@@ -142,6 +155,22 @@ function CarteMatch({ m }) {
       </div>
       <LigneEquipe equipe={m.home_team} score={m.home_score} gagnant={homeGagnant} statut={m.status} />
       <LigneEquipe equipe={m.away_team} score={m.away_score} gagnant={awayGagnant} statut={m.status} />
+
+      {buts.length > 0 && (
+        <div className="mt-2.5 pt-2 border-t border-white/10 grid grid-cols-2 gap-x-3 text-[11px] text-slate-400">
+          <div className="space-y-0.5 min-w-0">
+            {butsHome.map((b, i) => (
+              <ButeurLigne key={i} b={b} align="left" />
+            ))}
+          </div>
+          <div className="space-y-0.5 min-w-0">
+            {butsAway.map((b, i) => (
+              <ButeurLigne key={i} b={b} align="right" />
+            ))}
+          </div>
+        </div>
+      )}
+
       {tab && (
         <div className="mt-2 pt-2 border-t border-white/10 text-[11px] font-bold text-amber-400">
           Tirs au but : {m.home_penalty} – {m.away_penalty}

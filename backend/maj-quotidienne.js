@@ -3,6 +3,7 @@ import {
     appelApiSports,
     competitionsCibles,
     estLanceEnLigneDeCommande,
+    normaliserNomEquipe,
     obtenirEquipeMystere,
     obtenirSaison,
     obtenirSportFootball,
@@ -88,6 +89,58 @@ export async function finaliserMatchsBloques() {
 
     console.log(`✅ ${corriges} match(s) finalisé(s).`);
     return corriges;
+}
+
+// Récupère les buteurs des matchs terminés (endpoint /fixtures/events,
+// 1 appel par match) qui n'ont pas encore été enrichis. Limité par appel
+// pour ménager le quota API-Sports (100/jour). Rattrape le retard au fil
+// des cycles. Stocke par but : joueur, minute, côté (home/away), pénalty, csc.
+export async function enrichirButeurs(limite = 8, joursMax = 60) {
+    const depuis = new Date(Date.now() - joursMax * 24 * 60 * 60 * 1000);
+    const matchs = await prisma.match.findMany({
+        where: { status: 'FINISHED', api_id: { not: null }, buteurs_charges: false, start_time: { gte: depuis } },
+        include: {
+            team_match_home_team_idToteam: { select: { api_id: true, name: true } },
+            team_match_away_team_idToteam: { select: { api_id: true, name: true } },
+        },
+        orderBy: { start_time: 'desc' },
+        take: limite,
+    });
+
+    if (matchs.length === 0) return 0;
+    console.log(`⚽ Récupération des buteurs pour ${matchs.length} match(s)...`);
+    let n = 0;
+
+    for (const m of matchs) {
+        try {
+            const events = await appelApiSports('fixtures/events', { fixture: m.api_id });
+            const dom = m.team_match_home_team_idToteam;
+            const ext = m.team_match_away_team_idToteam;
+            const domNorm = normaliserNomEquipe(dom?.name);
+            // Rattache un but à domicile/extérieur : par api_id si dispo, sinon par nom
+            const coteDe = (team) => {
+                if (dom?.api_id != null && team?.id === dom.api_id) return 'home';
+                if (ext?.api_id != null && team?.id === ext.api_id) return 'away';
+                return normaliserNomEquipe(team?.name) === domNorm ? 'home' : 'away';
+            };
+            const buteurs = events
+                .filter((e) => e.type === 'Goal' && e.detail !== 'Missed Penalty' && e.player?.name)
+                .map((e) => {
+                    let cote = coteDe(e.team);
+                    const csc = e.detail === 'Own Goal';
+                    if (csc) cote = cote === 'home' ? 'away' : 'home'; // le csc profite à l'adversaire
+                    return { joueur: e.player.name, minute: e.time?.elapsed ?? null, cote, penalty: e.detail === 'Penalty', csc };
+                });
+            await prisma.match.update({ where: { match_id: m.match_id }, data: { events: buteurs, buteurs_charges: true } });
+            n++;
+        } catch (erreur) {
+            console.error(`❌ Buteurs du match ${m.api_id} :`, erreur.message);
+        }
+        await pause(6500); // Limite du plan gratuit : 10 appels/minute
+    }
+
+    console.log(`✅ Buteurs récupérés pour ${n} match(s).`);
+    return n;
 }
 
 if (estLanceEnLigneDeCommande(import.meta.url)) {

@@ -133,13 +133,10 @@ export async function obtenirSaison(competitionId, anneeSaison) {
 
 // Crée ou met à jour un match à partir des données brutes d'API-Sports.
 // Si le match a été créé par football-data (calendrier), on le retrouve par
-// saison + coup d'envoi et on ne met à jour que le déroulé (scores, statut,
-// buteurs) : football-data reste la référence pour les équipes et la phase.
+// saison + coup d'envoi et on ne met à jour que le déroulé (scores, statut) :
+// football-data reste la référence pour les équipes et la phase.
+// Les buteurs sont récupérés séparément (enrichirButeurs, endpoint dédié).
 export async function upsertMatch(matchDonnees, saison, sportId, equipeMystere) {
-    const buteurs = (matchDonnees.events || [])
-        .filter((e) => e.type === 'Goal')
-        .map((e) => ({ joueur: e.player.name, minute: e.time.elapsed, equipe: e.team.name }));
-
     const api_id = matchDonnees.fixture.id.toString();
     const startTime = new Date(matchDonnees.fixture.date);
 
@@ -151,7 +148,6 @@ export async function upsertMatch(matchDonnees, saison, sportId, equipeMystere) 
         away_penalty: matchDonnees.score?.penalty?.away ?? null,
         home_winner: matchDonnees.teams.home?.winner ?? null,
         away_winner: matchDonnees.teams.away?.winner ?? null,
-        events: buteurs,
     };
 
     const dejaConnu = await prisma.match.findUnique({ where: { api_id } });

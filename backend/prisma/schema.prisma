@@ -36,6 +36,7 @@ model match {
   away_winner                   Boolean?
   phase                         String?      @db.VarChar(100)
   events                        Json?
+  buteurs_charges               Boolean      @default(false)
   notified_at                   DateTime?    @db.Timestamptz(6)
   team_match_away_team_idToteam team         @relation("match_away_team_idToteam", fields: [away_team_id], references: [team_id], onDelete: NoAction, onUpdate: NoAction)
   team_match_home_team_idToteam team         @relation("match_home_team_idToteam", fields: [home_team_id], references: [team_id], onDelete: NoAction, onUpdate: NoAction)

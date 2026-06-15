@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import prisma from './lib/prisma.js';
 import { majCalendrier } from './maj-calendrier.js';
-import { majQuotidienne, finaliserMatchsBloques } from './maj-quotidienne.js';
+import { majQuotidienne, finaliserMatchsBloques, enrichirButeurs } from './maj-quotidienne.js';
 import { notifierMatchsTermines, envoyerATous } from './lib/notifications.js';
 import { construireICS } from './lib/calendar.js';
 
@@ -14,6 +14,32 @@ const port = process.env.PORT || 3000;
 // Middlewares
 app.use(express.json());
 app.use(cors());
+
+// ============================================================================
+// 🛡️ FILETS DE SÉCURITÉ : le serveur ne doit JAMAIS planter sur une erreur
+// isolée (base Neon momentanément injoignable, API tierce, etc.). On journalise
+// et on continue, plutôt que de laisser le process mourir et Railway redémarrer.
+// ============================================================================
+process.on('unhandledRejection', (raison) => {
+    console.error('⚠️ Rejet non géré (ignoré) :', raison?.message || raison);
+});
+process.on('uncaughtException', (err) => {
+    console.error('⚠️ Exception non gérée (ignorée) :', err?.message || err);
+});
+
+// Réessaie une opération (utile pour réveiller Neon qui se met en veille en
+// plan gratuit : le 1er appel après inactivité peut échouer le temps du réveil).
+async function avecReessai(fn, essais = 3, attenteMs = 2500) {
+    for (let i = 0; i < essais; i++) {
+        try {
+            return await fn();
+        } catch (erreur) {
+            if (i === essais - 1) throw erreur;
+            console.warn(`⏳ Base injoignable, nouvel essai ${i + 1}/${essais - 1}...`);
+            await new Promise((r) => setTimeout(r, attenteMs));
+        }
+    }
+}
 
 // ============================================================================
 // ⚙️ CYCLE DE MISE À JOUR (déclenché par le ping cron-job.org toutes les 10 min)
@@ -75,6 +101,15 @@ async function executerCycle() {
     }
     jobEnCours = true;
     try {
+        // Réveille la base (Neon se met en veille) avec réessai. Si elle reste
+        // injoignable, on abandonne proprement ce cycle (le prochain ping réessaiera).
+        try {
+            await avecReessai(() => prisma.$queryRaw`SELECT 1`);
+        } catch (erreur) {
+            console.error('❌ Base injoignable, cycle ignoré :', erreur.message);
+            return;
+        }
+
         if (syncQuotidienneDue()) {
             console.log(`\n🔄 [${new Date().toISOString()}] Synchro quotidienne...`);
             dernierJourSync = new Date().toISOString().slice(0, 10);
@@ -88,6 +123,11 @@ async function executerCycle() {
             } catch (erreur) {
                 console.error('❌ Erreur finalisation :', erreur.message);
             }
+            try {
+                await enrichirButeurs(30, 2000); // rattrapage des buteurs (tout l'historique, quota large à 4h)
+            } catch (erreur) {
+                console.error('❌ Erreur buteurs :', erreur.message);
+            }
             console.log('🏁 Synchro quotidienne terminée.');
         } else if (await fenetreMatchActive()) {
             console.log('⚽ Match dans sa fenêtre horaire : rafraîchissement des scores...');
@@ -95,6 +135,11 @@ async function executerCycle() {
                 await majQuotidienne();
             } catch (erreur) {
                 console.error('❌ Erreur rafraîchissement live :', erreur.message);
+            }
+            try {
+                await enrichirButeurs(6, 3); // buteurs des matchs récemment terminés
+            } catch (erreur) {
+                console.error('❌ Erreur buteurs :', erreur.message);
             }
         } else if (await aDesMatchsBloques()) {
             try {
@@ -111,6 +156,9 @@ async function executerCycle() {
         } catch (erreur) {
             console.error('❌ Erreur notifications fin de match :', erreur.message);
         }
+    } catch (erreur) {
+        // Dernier filet : aucune erreur du cycle ne doit faire planter le serveur
+        console.error('❌ Erreur inattendue du cycle :', erreur.message);
     } finally {
         jobEnCours = false;
     }
@@ -138,7 +186,7 @@ app.get('/cron-daily', (req, res) => {
     // On répond tout de suite (cron-job.org a un timeout court),
     // le cycle continue en arrière-plan.
     res.status(202).send('Cycle de mise à jour lancé.');
-    executerCycle();
+    executerCycle().catch((e) => console.error('❌ Cycle :', e.message));
 });
 
 // Liste des compétitions (page d'accueil)
