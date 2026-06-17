@@ -123,11 +123,11 @@ async function executerCycle() {
             } catch (erreur) {
                 console.error('❌ Erreur finalisation :', erreur.message);
             }
-            try {
-                await enrichirButeurs(30, 2000); // rattrapage des buteurs (tout l'historique, quota large à 4h)
-            } catch (erreur) {
-                console.error('❌ Erreur buteurs :', erreur.message);
-            }
+            // ⛔ Buteurs désactivés (17 juin 2026) : le compte API-Sports a été suspendu
+            // (quota 100/j dépassé pendant la Coupe du Monde). enrichirButeurs matraquait
+            // /fixtures/events (1 appel/match) → cause probable de la suspension.
+            // Réactiver la ligne ci-dessous une fois le compte API-Sports rétabli.
+            // try { await enrichirButeurs(30, 2000); } catch (erreur) { console.error('❌ Erreur buteurs :', erreur.message); }
             console.log('🏁 Synchro quotidienne terminée.');
         } else if (await fenetreMatchActive()) {
             console.log('⚽ Match dans sa fenêtre horaire : rafraîchissement des scores...');
@@ -136,11 +136,8 @@ async function executerCycle() {
             } catch (erreur) {
                 console.error('❌ Erreur rafraîchissement live :', erreur.message);
             }
-            try {
-                await enrichirButeurs(6, 3); // buteurs des matchs récemment terminés
-            } catch (erreur) {
-                console.error('❌ Erreur buteurs :', erreur.message);
-            }
+            // ⛔ Buteurs désactivés (voir note plus haut) — réactiver quand API-Sports refonctionne.
+            // try { await enrichirButeurs(6, 3); } catch (erreur) { console.error('❌ Erreur buteurs :', erreur.message); }
         } else if (await aDesMatchsBloques()) {
             try {
                 await finaliserMatchsBloques();
